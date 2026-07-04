@@ -274,3 +274,7 @@ Do not overload fatal status fields with recoverable scanner observations. For A
 ## Pi V0.1 acceptance bundle guardrail
 
 When a milestone has several hardware validators, add or maintain a single acceptance bundle that runs the required validators and emits one top-level `FINAL: PASS`/`FINAL: FAIL` summary. The bundle may warn on optional runtime data, such as the FAA Airband catalog, but required runtime paths must remain hard failures.
+
+## V0.2 UAT integration guardrail
+
+UAT work must start with a non-invasive Pi capability probe. Keep the `00000978` UAT receiver disabled in the persistent backend until the probe proves serial detection, exclusive receiver access, 978 MHz tuning/capture, and available decoder tooling. UAT patch scripts must preserve the validated V0.1 ADS-B, NOAA, Airband, and acceptance validation paths.
