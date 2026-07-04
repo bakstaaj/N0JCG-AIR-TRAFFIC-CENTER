@@ -47,6 +47,32 @@ post_json(){
   curl -sS --max-time 20 -X POST -H 'Content-Type: application/json' --data "$body" "$url" -o "$output"
 }
 
+
+wait_for_http_ready(){
+  local timeout_seconds="${1:-45}"
+  local deadline=$(( $(date +%s) + timeout_seconds ))
+  local attempt=0
+  local probe="$WORK_DIR/http_ready_status.json"
+  while [[ "$(date +%s)" -le "$deadline" ]]; do
+    attempt=$((attempt+1))
+    if curl -sS --max-time 3 "$BASE_URL/api/status" -o "$probe" >/dev/null 2>&1 && python3 -m json.tool "$probe" >/dev/null 2>&1; then
+      pass "HTTP API became ready at $BASE_URL after $attempt probe(s)"
+      return 0
+    fi
+    sleep 1
+  done
+  fail "HTTP API did not become ready at $BASE_URL within ${timeout_seconds}s"
+  if command -v systemctl >/dev/null 2>&1; then
+    log "--- systemctl status pi-air-traffic-tracker.service ---"
+    systemctl status --no-pager pi-air-traffic-tracker.service 2>&1 | tail -n 60 | tee -a "$REPORT_PATH" >/dev/null || true
+  fi
+  if command -v journalctl >/dev/null 2>&1; then
+    log "--- journalctl tail pi-air-traffic-tracker.service ---"
+    journalctl -u pi-air-traffic-tracker.service -n 120 --no-pager 2>&1 | tee -a "$REPORT_PATH" >/dev/null || true
+  fi
+  return 1
+}
+
 restore_sources(){
   if command -v curl >/dev/null 2>&1; then
     post_json "$BASE_URL/api/settings/traffic-sources" "{\"adsb_1090_enabled\":$ORIGINAL_ADSB,\"uat_978_enabled\":$ORIGINAL_UAT}" "$WORK_DIR/restore_sources.json" >/dev/null 2>&1 || true
@@ -78,6 +104,9 @@ if systemctl is-active --quiet pi-air-traffic-tracker.service; then
 else
   fail "pi-air-traffic-tracker.service is not active"
 fi
+
+section "HTTP API readiness"
+wait_for_http_ready 45 || true
 
 section "Traffic source settings API"
 SETTINGS_JSON="$WORK_DIR/traffic_sources_initial.json"
