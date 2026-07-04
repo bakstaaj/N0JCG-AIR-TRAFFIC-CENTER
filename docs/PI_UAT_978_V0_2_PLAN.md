@@ -35,3 +35,7 @@ Run this on the Pi after pulling the patch:
 ```
 
 The probe is intentionally non-invasive. It does not start a persistent UAT decoder, modify systemd units, or change runtime settings.
+
+## Raw IQ capture matrix
+
+The first UAT probe is intentionally hardware-only.  It must not start a persistent UAT service or change the V0.1 ADS-B/NOAA/Airband runtime.  Because `rtl_sdr` builds vary in accepted gain syntax and synchronous-read behavior, the probe tries a small capture matrix using the resolved runtime index and the stable UAT serial, with multiple sample rates and gain argument styles.  A raw IQ file with bytes proves that the UAT receiver can tune/open/capture at 978 MHz; actual UAT frame decoding remains a later V0.2 step.

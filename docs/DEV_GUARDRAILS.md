@@ -278,3 +278,7 @@ When a milestone has several hardware validators, add or maintain a single accep
 ## V0.2 UAT integration guardrail
 
 UAT work must start with a non-invasive Pi capability probe. Keep the `00000978` UAT receiver disabled in the persistent backend until the probe proves serial detection, exclusive receiver access, 978 MHz tuning/capture, and available decoder tooling. UAT patch scripts must preserve the validated V0.1 ADS-B, NOAA, Airband, and acceptance validation paths.
+
+## UAT raw capture guardrail
+
+Do not fail a UAT hardware milestone from a single `rtl_sdr` option combination. Resolve the receiver from the stable EEPROM serial first, then try a bounded capture matrix covering runtime index, stable serial, sample-rate candidates, and gain argument styles. Treat the milestone as hardware-ready when raw IQ bytes are captured; keep decoder installation and persistent service enablement in separate later milestones.

@@ -237,19 +237,61 @@ else
 fi
 
 section "978 MHz raw capture check"
-if [[ -n "$UAT_INDEX" && -x "$(command -v rtl_sdr 2>/dev/null || true)" ]]; then
-  UAT_IQ="$WORK_DIR/uat_978_probe.iq"
-  UAT_CAPTURE_LOG="$WORK_DIR/uat_978_rtl_sdr.log"
-  timeout 8 rtl_sdr -d "$UAT_INDEX" -f "$UAT_FREQUENCY_HZ" -s "$UAT_SAMPLE_RATE" -g "$UAT_GAIN_DB" -n 262144 "$UAT_IQ" >"$UAT_CAPTURE_LOG" 2>&1
-  cap_rc=$?
-  cat "$UAT_CAPTURE_LOG" | tee -a "$REPORT_PATH" >/dev/null
-  bytes=0
-  [[ -f "$UAT_IQ" ]] && bytes="$(wc -c < "$UAT_IQ" | tr -d ' ')"
-  log "UAT_IQ_BYTES=$bytes"
-  if [[ "$cap_rc" -eq 0 && "$bytes" -gt 0 ]]; then
-    pass "captured raw IQ at 978 MHz from UAT receiver"
+RTL_SDR_CMD="$(command -v rtl_sdr 2>/dev/null || true)"
+if [[ -n "$UAT_INDEX" && -n "$RTL_SDR_CMD" && -x "$RTL_SDR_CMD" ]]; then
+  UAT_IQ_OK=0
+  UAT_IQ_BYTES=0
+  UAT_CAPTURE_SUCCESS_LABEL=""
+  UAT_CAPTURE_ATTEMPT=0
+  UAT_CAPTURE_MATRIX="$WORK_DIR/uat_978_capture_matrix.tsv"
+  printf 'attempt\tdevice_arg\tsample_rate\tgain_arg\texit_code\tbytes\tfile\n' > "$UAT_CAPTURE_MATRIX"
+
+  # rtl_sdr builds vary in accepted gain syntax and sync-read behavior.  Try a
+  # small matrix before declaring the UAT hardware path failed.  Keep this as a
+  # hardware-open/capture proof only; it does not decode UAT frames yet.
+  read -r -a UAT_SAMPLE_RATE_CANDIDATES <<< "${PI_AIR_TRAFFIC_UAT_SAMPLE_RATE_CANDIDATES:-$UAT_SAMPLE_RATE 2400000 2048000 2000000 1024000}"
+  read -r -a UAT_GAIN_CANDIDATES <<< "${PI_AIR_TRAFFIC_UAT_GAIN_CANDIDATES:-$UAT_GAIN_DB 496 480 auto}"
+
+  for device_arg in "$UAT_INDEX" "$UAT_SERIAL"; do
+    [[ -z "$device_arg" ]] && continue
+    for sample_rate in "${UAT_SAMPLE_RATE_CANDIDATES[@]}"; do
+      [[ -z "$sample_rate" ]] && continue
+      for gain_arg in "${UAT_GAIN_CANDIDATES[@]}"; do
+        [[ -z "$gain_arg" ]] && continue
+        UAT_CAPTURE_ATTEMPT=$((UAT_CAPTURE_ATTEMPT+1))
+        UAT_IQ="$WORK_DIR/uat_978_probe_${UAT_CAPTURE_ATTEMPT}.iq"
+        UAT_CAPTURE_LOG="$WORK_DIR/uat_978_rtl_sdr_${UAT_CAPTURE_ATTEMPT}.log"
+        rm -f "$UAT_IQ"
+        sleep 1
+        if [[ "$gain_arg" == "auto" ]]; then
+          timeout 12 rtl_sdr -d "$device_arg" -f "$UAT_FREQUENCY_HZ" -s "$sample_rate" -n 262144 "$UAT_IQ" >"$UAT_CAPTURE_LOG" 2>&1
+        else
+          timeout 12 rtl_sdr -d "$device_arg" -f "$UAT_FREQUENCY_HZ" -s "$sample_rate" -g "$gain_arg" -n 262144 "$UAT_IQ" >"$UAT_CAPTURE_LOG" 2>&1
+        fi
+        cap_rc=$?
+        bytes=0
+        [[ -f "$UAT_IQ" ]] && bytes="$(wc -c < "$UAT_IQ" | tr -d ' ')"
+        printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$UAT_CAPTURE_ATTEMPT" "$device_arg" "$sample_rate" "$gain_arg" "$cap_rc" "$bytes" "$UAT_IQ" >> "$UAT_CAPTURE_MATRIX"
+        log "UAT_CAPTURE_ATTEMPT=$UAT_CAPTURE_ATTEMPT DEVICE_ARG=$device_arg SAMPLE_RATE=$sample_rate GAIN_ARG=$gain_arg EXIT=$cap_rc BYTES=$bytes"
+        sed -n '1,20p' "$UAT_CAPTURE_LOG" | sed "s/^/  rtl_sdr: /" | tee -a "$REPORT_PATH" >/dev/null
+        if [[ "${bytes:-0}" =~ ^[0-9]+$ && "${bytes:-0}" -ge 131072 ]]; then
+          UAT_IQ_OK=1
+          UAT_IQ_BYTES="$bytes"
+          UAT_CAPTURE_SUCCESS_LABEL="device_arg=$device_arg sample_rate=$sample_rate gain_arg=$gain_arg exit_code=$cap_rc bytes=$bytes"
+          if [[ "$cap_rc" -ne 0 ]]; then
+            warn "rtl_sdr produced IQ bytes but exited with code $cap_rc; treating hardware capture as usable and recording warning"
+          fi
+          break 3
+        fi
+      done
+    done
+  done
+  log "UAT_CAPTURE_MATRIX=$UAT_CAPTURE_MATRIX"
+  log "UAT_IQ_BYTES=$UAT_IQ_BYTES"
+  if [[ "$UAT_IQ_OK" -eq 1 ]]; then
+    pass "captured raw IQ at 978 MHz from UAT receiver: $UAT_CAPTURE_SUCCESS_LABEL"
   else
-    fail "raw 978 MHz IQ capture failed; rtl_sdr exit code $cap_rc, bytes=$bytes"
+    fail "raw 978 MHz IQ capture failed across capture matrix; see $UAT_CAPTURE_MATRIX and rtl_sdr logs in $WORK_DIR"
   fi
 else
   warn "skipping raw 978 MHz capture because rtl_sdr is missing or UAT index is unresolved"
