@@ -93,3 +93,7 @@ runtime/logs/
 .pi_service_smoke_patch_backups/
 .pi_live_validation_patch_reports/
 .pi_live_validation_patch_backups/
+
+.pi_readsb_stale_patch_backups/
+
+.pi_readsb_stale_patch_reports/

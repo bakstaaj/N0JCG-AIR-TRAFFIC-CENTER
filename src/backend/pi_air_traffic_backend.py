@@ -196,13 +196,10 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
         return command
 
     def is_running(self) -> bool:
-        if self.process is not None and self.process.poll() is None:
-            return True
-        try:
-            payload = self.query_aircraft(timeout=0.75)
-            return isinstance(payload, dict) and isinstance(payload.get("aircraft"), list)
-        except Exception:
-            return False
+        # Only the child process owned by this backend proves decoder liveness.
+        # A readable aircraft.json can be stale after a service restart; treating
+        # it as running prevents readsb from being launched and freezes ADS-B data.
+        return self.process is not None and self.process.poll() is None
 
     def query_aircraft(self, timeout: float = 1.5) -> dict[str, Any]:
         del timeout

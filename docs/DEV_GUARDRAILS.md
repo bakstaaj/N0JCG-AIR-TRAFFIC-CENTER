@@ -218,3 +218,14 @@ Hardware role commits must include the evidence source and validator path. A pre
 - Python source validation must use `git ls-files '*.py'` as the source of truth, must report the actual tracked file count, and must not mark a successful zero-file validation as a failed compile.
 - Patch scripts must normalize touched text files before `git diff --cached --check` so blank EOF/trailing whitespace failures are caught before commit and never pushed.
 - Patch scripts may run `git push` only after repository validation, staging, executable-mode checks, staged whitespace checks, and commit all pass.
+## Pi readsb process liveness guardrail
+
+- The Pi backend must not treat the mere existence or readability of `aircraft.json` as proof that `readsb` is currently running.
+- Stale `runtime/settings/readsb-json/aircraft.json` files can remain after service restarts and must not short-circuit ADS-B decoder startup.
+- `PiSerialDecoderManager.is_running()` must reflect the backend-owned child process state; status/reporting code may read JSON for telemetry, but startup gating must launch `readsb` when no child process is alive.
+- Fresh-start validators should stop the service, leave a stale JSON sentinel, restart the service, and confirm app-owned `runtime/bin/readsb` is launched for serial `00001090`.
+## Patch-script local artifact guardrail
+
+- Patch scripts that create report or backup directories must ignore their own local artifact roots during preflight clean-tree checks.
+- Add known script-local roots such as `.pi_*_reports/` and `.pi_*_backups/` to `.gitignore` before staging, but do not fail only because the current script created its report directory.
+- Clean-tree checks should still fail on unrelated source, docs, runtime template, or tool changes.
