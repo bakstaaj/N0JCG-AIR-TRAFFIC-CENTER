@@ -1,0 +1,48 @@
+# Build and generated artifacts
+/build/
+/dist/*
+!/dist/.gitkeep
+/test_output/*
+!/test_output/.gitkeep
+
+# Runtime configuration and secrets
+/runtime/settings/*
+!/runtime/settings/.gitkeep
+.env
+*.key
+*api_key*.json
+*route_cache*.json
+
+# Captures, audio, logs and temporary diagnostics
+*.iq
+*.wav
+*.log
+*.tmp
+*.bak
+*.before_*
+*.broken_before_*
+
+# IDE / operating-system noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Python generated files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# RTL-Windows Pi UI port local runtime/private data
+/runtime/service/
+/runtime/logs/
+/runtime/settings/application_settings.json
+/runtime/settings/faa_airband_catalog.json
+/runtime/settings/airlabs_api.json
+/runtime/settings/airlabs_route_cache.json
+/runtime/settings/aircraft_trails_history.json
+/runtime/settings/aircraft_trails_control.json
+
+.port_fix_backups/
+
+.commit_baseline_backups/
