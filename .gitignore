@@ -60,3 +60,6 @@ __pycache__/
 .pre_hardware_whitespace_fix_reports/
 .pre_hardware_restage_backups/
 .pre_hardware_restage_reports/
+
+.executable_bit_fix_backups/
+.exec_bits_json_scope_backups/

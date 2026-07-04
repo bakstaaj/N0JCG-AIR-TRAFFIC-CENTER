@@ -90,3 +90,22 @@ When new feedback is given about scripts, deployment, build workflow, supported 
 ## Staged Whitespace Recovery Guardrail
 
 If `git diff --cached --check` fails after a generated patch, do not visually inspect and hand-edit files as the primary workflow. Use a repo-root repair script that backs up the intended files, unstages the pending change set, normalizes the working-tree copies, restages the corrected files, force-adds only intentional ignored templates, reruns `git diff --cached --check`, and commits only after PASS validation.
+
+## Executable Script Tracking Guardrail
+
+- Runnable Pi/Linux shell scripts under `tools/` must be committed with the Git executable bit set.
+- A `Permission denied` result from `./tools/name.sh` after clone usually means the script content exists but Git mode was not tracked as executable.
+- Immediate operator workaround is `bash ./tools/name.sh`, but the repo fix should use `chmod +x` plus `git update-index --chmod=+x` before commit.
+- Executable-bit fixes must validate both `bash -n` syntax and tracked mode `100755` for intended runnable `.sh` files.
+
+## JSON Validation Guardrail
+
+- JSON files must be validated one file at a time.
+- Do not call `python3 -m json.tool` with multiple input files in one command; it accepts one input JSON file and an optional output file.
+- Use a loop with explicit PASS/FAIL accounting for multi-file JSON validation.
+
+## Executable-Bit Scope Guardrail
+
+- Executable-bit fixes should be scoped to scripts required by the active workflow.
+- Do not mass-stage executable-bit changes for unrelated copied scripts unless that broad cleanup is the explicit task.
+- When a mass chmod accidentally touches unrelated scripts, unstage, restore the unrelated paths, then stage only the intended workflow files.
