@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "profile_name": "pi5_flycatcher_nano2plus_initial",
+  "platform": "raspberry_pi_5_trixie",
+  "notes": [
+    "Template only. Do not hard-code RTL indexes until live Pi enumeration is captured.",
+    "Initial milestone uses FlyCatcher ADS-B for 1090 MHz and NESDR Nano2+ for NOAA/Airband.",
+    "FlyCatcher UAT is reserved for a later milestone."
+  ],
+  "roles": {
+    "adsb_1090": {
+      "enabled": true,
+      "hardware": "FlyCatcher ADS-B side",
+      "frequency_hz": 1090000000,
+      "rtl_index": null,
+      "rtl_serial": null,
+      "service": "pi-air-traffic-adsb",
+      "decoder": "readsb_or_dump1090"
+    },
+    "noaa_airband": {
+      "enabled": true,
+      "hardware": "NESDR Nano2+ external USB SDR",
+      "noaa_frequency_hz": null,
+      "airband_start_hz": 118000000,
+      "airband_end_hz": 136975000,
+      "rtl_index": null,
+      "rtl_serial": null,
+      "service": "pi-air-traffic-radio",
+      "decoder": "rtl_fm_backend"
+    },
+    "uat_978": {
+      "enabled": false,
+      "hardware": "FlyCatcher UAT side",
+      "frequency_hz": 978000000,
+      "rtl_index": null,
+      "rtl_serial": null,
+      "service": null,
+      "decoder": null
+    }
+  }
+}

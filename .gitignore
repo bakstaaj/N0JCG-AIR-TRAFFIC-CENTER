@@ -46,3 +46,17 @@ __pycache__/
 .port_fix_backups/
 
 .commit_baseline_backups/
+
+# Local script backups
+.pre_hardware_prep_backups/
+
+# Local script backups
+.pre_hardware_prep_fix_backups/
+
+# Local script backups
+.pre_hardware_whitespace_fix_backups/
+
+# Local script reports
+.pre_hardware_whitespace_fix_reports/
+.pre_hardware_restage_backups/
+.pre_hardware_restage_reports/

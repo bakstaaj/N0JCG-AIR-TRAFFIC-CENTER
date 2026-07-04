@@ -80,3 +80,13 @@ When new feedback is given about scripts, deployment, build workflow, supported 
 - Script-created backup directories such as `.port_fix_backups/` and `.commit_baseline_backups/` are local recovery artifacts.
 - These backup directories should be ignored by Git and should not be committed to the repository.
 - If a fix script creates a new backup directory pattern, update `.gitignore` and this guardrails document before or alongside the patch.
+
+## PI Air Traffic Tracker Pre-Hardware Rule\n\n- Before FlyCatcher/Nano2+ hardware arrives, it is acceptable to add documentation, config templates, no-device validation scripts, and Pi runtime readiness checks.\n- Do not hard-code RTL device indexes before live Pi enumeration evidence is collected.\n- Do not enable UAT runtime features until the project explicitly moves to the UAT phase; reserve/configure UAT role only.\n- Keep ADS-B 1090 on the FlyCatcher ADS-B side and NOAA/Airband on the external NESDR Nano2+ for the first hardware milestone.\n- Hardware-dependent backend patches must be based on actual \, \, USB, and service/runtime evidence collected from the Pi.
+
+## Ignored Runtime Template Guardrail\n\n- Runtime directories such as `runtime/settings/` may be broadly ignored to protect local state.\n- If a version-controlled template must live under an ignored runtime path, scripts must stage only the exact intended template with `git add -f <path>`; do not broadly unignore or stage runtime state.\n- Scripts must wrap `git add` operations in explicit PASS/FAIL checks so ignored-path failures do not abort before the final summary.\n- Prefer canonical documentation/templates under `docs/` for future templates unless the runtime path is required by the application.
+
+## Git Whitespace Auto-Fix Guardrail\n\n- If `git diff --check` fails after a generated patch, fix scripts should normalize only the intended touched files instead of broad-formatting the repository.\n- Whitespace fix scripts should remove CRLF endings, strip trailing spaces/tabs, ensure final newlines, then rerun `git diff --cached --check` as a PASS/FAIL validation.\n- If whitespace validation still fails, scripts should write the check output to an ignored report file and still reach the final PASS/FAIL summary.
+
+## Staged Whitespace Recovery Guardrail
+
+If `git diff --cached --check` fails after a generated patch, do not visually inspect and hand-edit files as the primary workflow. Use a repo-root repair script that backs up the intended files, unstages the pending change set, normalizes the working-tree copies, restages the corrected files, force-adds only intentional ignored templates, reruns `git diff --cached --check`, and commits only after PASS validation.
