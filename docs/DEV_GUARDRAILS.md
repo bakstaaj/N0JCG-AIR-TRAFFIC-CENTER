@@ -241,3 +241,10 @@ Active audio validation must be handled as an operational test, not a pure API s
 ## Patch script cleanliness guardrail
 
 Patch/recovery scripts must not fail merely because unrelated untracked local artifacts exist, including generated report folders, backup folders, runtime/preflight outputs, or accidental scratch files from earlier validation runs. Scripts must stage explicit path lists, warn about unrelated untracked files that are left untouched, and fail only on unexpected tracked/staged changes outside the patch's intended file set. Report directories created by the current script must be ignored or created after the cleanliness decision so the script never fails on its own output.
+
+## Pi Airband catalog runtime-data guardrail
+
+- The Airband scanner depends on `runtime/settings/faa_airband_catalog.json`; this generated FAA NASR catalog is runtime data and must not be assumed present after a fresh clone or pull.
+- Active Airband scanner validators must check `/api/airband/channels` before starting the scanner. If the channel list is empty, fail with an actionable catalog-import prerequisite instead of treating it as an SDR/audio failure.
+- Use `tools/pi5_import_faa_airband_catalog.sh` to import a FAA FRQ CSV ZIP and restart/revalidate the service. Use `tools/pi5_validate_airband_catalog.sh` before active Airband scanner validation.
+- Patch scripts must ignore unrelated untracked local artifacts and known report/backup directories during preflight; they must stage explicit intended paths only and fail only on unexpected tracked/staged changes outside the patch set.

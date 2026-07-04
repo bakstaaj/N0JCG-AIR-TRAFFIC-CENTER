@@ -104,3 +104,5 @@ runtime/logs/
 # PI active validation local reports
 .pi_active_validation_patch_reports/
 .pi_active_validation_patch_backups/
+.pi_airband_catalog_patch_reports/
+.pi_airband_catalog_patch_backups/
