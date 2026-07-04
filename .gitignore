@@ -68,3 +68,8 @@ __pycache__/
 .pre_hardware_restage_whitespace_reports/
 .report_dir_cleanup_backups/
 .report_dir_cleanup_reports/
+.pi_dependency_installer_patch_backups/
+.pi_runtime_dependency_reports/
+.pi5_runtime_dependency_reports/
+.pi_runtime_dependency_recovery_backups/
+.pi_runtime_dependency_recovery_reports/
