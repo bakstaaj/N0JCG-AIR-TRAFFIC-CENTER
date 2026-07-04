@@ -42,3 +42,7 @@ The first UAT probe is intentionally hardware-only.  It must not start a persist
 ## Decoder tooling checkpoint
 
 The first UAT hardware probe passed after adding the capture matrix. The next checkpoint adds app-owned FlightAware `dump978-fa` tooling while keeping persistent UAT runtime disabled. See `docs/PI_UAT_978_DUMP978_TOOLING.md`.
+
+## Backend API Controls
+
+Manual UAT backend controls are added after hardware capture and decoder tooling validation. Persistent UAT autostart remains disabled; the backend exposes `/api/uat/status`, `/api/uat/start`, and `/api/uat/stop` for controlled validation and future UI work.

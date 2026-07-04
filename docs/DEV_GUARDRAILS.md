@@ -298,3 +298,11 @@ also contains a known fatal SDR/configuration pattern.
 ### dump978 timeout classifier guardrail
 - In non-persistent UAT decoder probes, `timeout` exit code 124 is success when `dump978-fa` stays alive until the controlled stop.
 - Classify rc=124 before broad log scanning; shutdown logs can include generic error text even when SDR startup succeeded.
+
+### UAT manual backend control guardrail
+
+UAT 978 MHz work must keep persistent UAT autostart disabled until a dedicated acceptance gate proves service behavior. V0.2 backend API work may expose manual `/api/uat/start`, `/api/uat/stop`, and `/api/uat/status` controls using serial `00000978`, but it must not disturb ADS-B, NOAA, or Airband runtime ownership.
+
+## Guardrail folder index — UAT 978 backend API
+
+- `docs/guardrails/PI_UAT_978_BACKEND_API_GUARDRAIL.md` — V0.2 UAT manual backend API controls, serial ownership, no autostart, app-owned `dump978-fa`, and validator executable-mode requirements.

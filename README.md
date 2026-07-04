@@ -140,3 +140,7 @@ See `docs/PI_V0_1_ACCEPTANCE_SUITE.md` for the full acceptance contract.
 ## V0.2 UAT 978 MHz development
 
 V0.2 starts UAT support in gated steps. The UAT receiver serial is `00000978` and remains disabled in the persistent runtime until decoder tooling and backend integration are validated. Hardware probing is handled by `tools/pi5_probe_uat_978_capability.sh`; app-owned decoder tooling is handled by `tools/pi5_install_app_owned_dump978.sh` and `tools/pi5_validate_uat_decoder_tooling.sh`.
+
+### V0.2 UAT 978 manual backend controls
+
+UAT 978 MHz development now includes manual backend API controls for the app-owned `dump978-fa` decoder. Persistent UAT autostart remains disabled. Validate with `./tools/pi5_validate_uat_backend_api.sh` after installing `runtime/bin/dump978-fa`.
