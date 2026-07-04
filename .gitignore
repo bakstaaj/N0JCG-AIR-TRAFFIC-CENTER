@@ -76,3 +76,5 @@ __pycache__/
 .exec_bit_fix_backups/
 .serial_mapping_reports/
 runtime/preflight/
+.pi_backend_serial_patch_reports/
+.pi_backend_serial_patch_backups/
