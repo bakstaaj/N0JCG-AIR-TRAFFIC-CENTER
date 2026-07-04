@@ -205,3 +205,16 @@ Hardware role commits must include the evidence source and validator path. A pre
 - Systemd service units for the Pi tracker must run from the checked-out repo root, set `RTL_ADSB_TRACKER_RUNTIME` to the repo `runtime` directory, and expose the web UI on `0.0.0.0:8090` by default.
 - Service and smoke validators must prove `/api/status`, `/api/aircraft.json`, `/`, `/app.js`, and `/app.css` respond before declaring PASS.
 - Patch scripts that include push must only push after repo validation, staged whitespace validation, commit success, and a clean post-commit state.
+
+## Pi live functional validation
+- Live functional validators should run against the service without changing receiver settings or starting long-running scans unless the milestone explicitly says so.
+- Separate hard service/API failures from RF-environment warnings. A healthy decoder with no ADS-B message increase during a short indoor/quiet observation window should warn, not fail.
+- Validate the Pi `/api/status` contract, app-owned readsb command, receiver serial roles, UI assets, aircraft JSON, NOAA capture, and passive Airband endpoints before treating the Pi service as operational.
+- Patch scripts may push to origin only after all local validation passes and the intended commit succeeds. If validation fails, do not push.
+- For large generated shell payloads, prefer shell here-docs and validate generated scripts with `bash -n`; avoid fragile nested quote generators that can fail before writing files.
+
+## Patch script validation recovery rules
+- Patch scripts that use generated helper code must avoid fragile nested quoting patterns when shell here-docs are sufficient.
+- Python source validation must use `git ls-files '*.py'` as the source of truth, must report the actual tracked file count, and must not mark a successful zero-file validation as a failed compile.
+- Patch scripts must normalize touched text files before `git diff --cached --check` so blank EOF/trailing whitespace failures are caught before commit and never pushed.
+- Patch scripts may run `git push` only after repository validation, staging, executable-mode checks, staged whitespace checks, and commit all pass.
