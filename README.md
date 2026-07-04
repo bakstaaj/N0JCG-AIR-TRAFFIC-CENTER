@@ -144,3 +144,7 @@ V0.2 starts UAT support in gated steps. The UAT receiver serial is `00000978` an
 ### V0.2 UAT 978 manual backend controls
 
 UAT 978 MHz development now includes manual backend API controls for the app-owned `dump978-fa` decoder. Persistent UAT autostart remains disabled. Validate with `./tools/pi5_validate_uat_backend_api.sh` after installing `runtime/bin/dump978-fa`.
+
+### V0.2 Traffic Source Controls
+
+The Configuration menu includes source switches for 1090 MHz ADS-B and 978 MHz UAT. Enabled sources are merged into the existing `/api/aircraft.json` feed so aircraft continue to appear in the same map, active aircraft list, trail history, and detail UI. ADS-B 1090 defaults to on; UAT 978 defaults to off until enabled by the operator.

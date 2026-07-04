@@ -458,3 +458,22 @@ body.map-popout-window .leaflet-container {
   background: #101820;
 }
 /* MAP_POPOUT_FULLSCREEN_V1_END */
+
+/* V0.2 traffic source controls */
+.traffic-source-controls .traffic-source-row {
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.source-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 0.45rem;
+  background: rgba(255,255,255,0.04);
+}
+.source-toggle input {
+  transform: scale(1.1);
+}

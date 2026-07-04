@@ -306,3 +306,6 @@ UAT 978 MHz work must keep persistent UAT autostart disabled until a dedicated a
 ## Guardrail folder index — UAT 978 backend API
 
 - `docs/guardrails/PI_UAT_978_BACKEND_API_GUARDRAIL.md` — V0.2 UAT manual backend API controls, serial ownership, no autostart, app-owned `dump978-fa`, and validator executable-mode requirements.
+
+## Guardrail Index
+- [Unified traffic source merge](guardrails/PI_TRAFFIC_SOURCE_MERGE_GUARDRAIL.md) — 1090 ADS-B and 978 UAT feed one aircraft UI.

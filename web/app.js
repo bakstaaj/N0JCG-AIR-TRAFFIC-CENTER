@@ -970,6 +970,63 @@ function renderLocation(location) {
   setReceiverOnMap(location);
 }
 
+
+function sourceLabelForAircraft(aircraft) {
+  const source = String(aircraft && aircraft.source || '').toLowerCase();
+  const sources = Array.isArray(aircraft && aircraft.sources) ? aircraft.sources : [];
+  if (sources.includes('adsb_1090') && sources.includes('uat_978')) return '1090+UAT';
+  if (source.includes('uat_978')) return 'UAT';
+  if (source.includes('adsb_1090')) return '1090';
+  return '';
+}
+function renderTrafficSources(status) {
+  const sourceStatus = status && (status.traffic_sources || status);
+  const adsbToggle = el('trafficSource1090');
+  const uatToggle = el('trafficSourceUat978');
+  if (!sourceStatus || !adsbToggle || !uatToggle) return;
+  const adsb = sourceStatus.adsb_1090 || {};
+  const uat = sourceStatus.uat_978 || {};
+  const adsbEnabled = sourceStatus.adsb_1090_enabled != null ? Boolean(sourceStatus.adsb_1090_enabled) : Boolean(adsb.enabled);
+  const uatEnabled = sourceStatus.uat_978_enabled != null ? Boolean(sourceStatus.uat_978_enabled) : Boolean(uat.enabled);
+  adsbToggle.checked = adsbEnabled;
+  uatToggle.checked = uatEnabled;
+  const parts = [
+    `1090 ${adsbEnabled ? 'on' : 'off'}${adsb.running ? ' / running' : ''}`,
+    `UAT ${uatEnabled ? 'on' : 'off'}${uat.running ? ' / running' : ''}`
+  ];
+  if (uat.collector_error) parts.push(`UAT collector: ${uat.collector_error}`);
+  setMessage('trafficSourceMessage', `Unified aircraft feed: ${parts.join(' · ')}`, (adsbEnabled || uatEnabled) ? 'good' : 'warning');
+}
+async function loadTrafficSources() {
+  try {
+    renderTrafficSources(await jsonRequest('/api/settings/traffic-sources'));
+  } catch (error) {
+    setMessage('trafficSourceMessage', `Traffic source settings unavailable: ${error.message}`, 'error');
+  }
+}
+async function saveTrafficSources() {
+  const payload = {
+    adsb_1090_enabled: Boolean(el('trafficSource1090') && el('trafficSource1090').checked),
+    uat_978_enabled: Boolean(el('trafficSourceUat978') && el('trafficSourceUat978').checked)
+  };
+  if (!payload.adsb_1090_enabled && !payload.uat_978_enabled) {
+    setMessage('trafficSourceMessage', 'At least one aircraft traffic source should remain enabled.', 'warning');
+  }
+  try {
+    setMessage('trafficSourceMessage', 'Applying traffic source settings…', 'warning');
+    const result = await jsonRequest('/api/settings/traffic-sources', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    renderTrafficSources(result);
+    await updateStatus();
+    await updateAircraft();
+  } catch (error) {
+    setMessage('trafficSourceMessage', `Traffic source update failed: ${error.message}`, 'error');
+  }
+}
+
 async function updateStatus() {
   try {
     const status = requireObjectResponse(await jsonRequest('/api/status'), 'Receiver status');
@@ -979,6 +1036,7 @@ async function updateStatus() {
     setText('messageCount', formattedNumber(status.messages));
     setText('aircraftCount', formattedNumber(status.aircraft_count));
     setText('positionCount', formattedNumber(status.aircraft_with_position));
+    renderTrafficSources(status);
     updateAudioButtons(status);
     if (!el('locationName').dataset.edited) renderLocation(status.receiver_location);
   } catch (error) {
@@ -1432,6 +1490,15 @@ async function updateAircraft() {
     const body = el('aircraftRows');
     const aircraft = Array.isArray(data.aircraft) ? data.aircraft : [];
     const activeAircraft = aircraft.filter(isAircraftRecordActive);
+    if (data && data.source_counts) {
+      setText('messageCount', formattedNumber(Number(data.messages || 0)));
+      setText('aircraftCount', formattedNumber(activeAircraft.length));
+      setText('positionCount', formattedNumber(activeAircraft.filter(item => Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lon))).length));
+      const adsbCount = Number(data.source_counts.adsb_1090 || 0);
+      const uatCount = Number(data.source_counts.uat_978 || 0);
+      const enabled = data.source_enabled || {};
+      setMessage('trafficSourceMessage', `Unified aircraft feed: 1090 ${enabled.adsb_1090 ? 'on' : 'off'} (${adsbCount}) · UAT ${enabled.uat_978 ? 'on' : 'off'} (${uatCount})`, (enabled.adsb_1090 || enabled.uat_978) ? 'good' : 'warning');
+    }
     updateAircraftMap(activeAircraft);
     const visibleAircraft = activeAircraft.slice(0, 20);
     body.replaceChildren();
@@ -1445,7 +1512,9 @@ async function updateAircraft() {
       row.title = 'Click for aircraft and flight details';
       row.addEventListener('click', () => showAircraftDetails(item));
       const flight = item.flight ? item.flight.trim() : '';
-      const values = [flight || String(item.hex || '').toUpperCase(), item.alt_baro, item.gs, item.seen];
+      const sourceLabel = sourceLabelForAircraft(item);
+      const ident = flight || String(item.hex || '').toUpperCase();
+      const values = [sourceLabel ? `${ident} · ${sourceLabel}` : ident, item.alt_baro, item.gs, item.seen];
       for (const value of values) {
         const cell = document.createElement('td');
         cell.textContent = value == null ? '' : value;
@@ -2589,6 +2658,7 @@ function bindControls() {
   el('autoNoaa').addEventListener('click', autoNoaa);
   el('saveLocation').addEventListener('click', saveLocation);
   el('saveAirbandRadius').addEventListener('click', saveAirbandRadius);
+  if (el('saveTrafficSources')) el('saveTrafficSources').addEventListener('click', saveTrafficSources);
   el('saveAirlabsKey').addEventListener('click', saveAirlabsKey);
   el('clearAirlabsKey').addEventListener('click', clearAirlabsKey);
   el('testAirlabsKey').addEventListener('click', testAirlabsKey);
@@ -2635,6 +2705,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderStoredTrails(new Set(aircraftMapMarkers.keys()));
   bindControls();
   loadAirlabsSettings();
+  loadTrafficSources();
   loadTrailHistoryFromServer();
   updateStatus();
   updateAircraft();
