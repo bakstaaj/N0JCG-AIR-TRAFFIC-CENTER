@@ -282,3 +282,7 @@ UAT work must start with a non-invasive Pi capability probe. Keep the `00000978`
 ## UAT raw capture guardrail
 
 Do not fail a UAT hardware milestone from a single `rtl_sdr` option combination. Resolve the receiver from the stable EEPROM serial first, then try a bounded capture matrix covering runtime index, stable serial, sample-rate candidates, and gain argument styles. Treat the milestone as hardware-ready when raw IQ bytes are captured; keep decoder installation and persistent service enablement in separate later milestones.
+
+## UAT decoder tooling guardrail
+
+Do not enable a persistent UAT 978 MHz decoder service until the app-owned decoder binary is installed, the UAT serial opens through SoapySDR by EEPROM serial, and the existing V0.1 ADS-B/NOAA/Airband acceptance suite remains green. UAT patch milestones must keep serial `00000978` isolated from the running ADS-B and audio receivers.
