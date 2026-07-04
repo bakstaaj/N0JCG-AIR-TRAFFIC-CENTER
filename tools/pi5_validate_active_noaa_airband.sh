@@ -102,6 +102,24 @@ curl_audio() {
   curl -sS --max-time 15 -D "$headers" -o "$output" -w '%{http_code}' "$BASE_URL$path"
 }
 
+wait_for_service_ready() {
+  local output="$1"
+  local attempt tmp code
+  for attempt in $(seq 1 45); do
+    tmp="${output}.attempt_${attempt}.json"
+    code="$(curl -sS --connect-timeout 1 --max-time 3 -H 'Cache-Control: no-cache' -o "$tmp" -w '%{http_code}' "$BASE_URL/api/status" 2>/dev/null || true)"
+    if [[ "$code" == "200" ]] && python3 -m json.tool "$tmp" >/dev/null 2>&1; then
+      cp "$tmp" "$output"
+      log "SERVICE_READY_ATTEMPT=$attempt HTTP=$code DETAIL=ready"
+      return 0
+    fi
+    log "SERVICE_READY_ATTEMPT=$attempt HTTP=${code:-curl_failed} DETAIL=waiting"
+    sleep 1
+  done
+  return 1
+}
+
+
 restore_airband_tuning() {
   if [[ -n "$ORIGINAL_AIRBAND_JSON" && -s "$ORIGINAL_AIRBAND_JSON" ]]; then
     local payload
@@ -150,12 +168,19 @@ for cmd in curl python3; do
   fi
 done
 
-section "Baseline service status"
+section "Service readiness"
 STATUS_JSON="$WORK_DIR/status_initial.json"
-if curl_json_get "/api/status" "$STATUS_JSON" && python3 -m json.tool "$STATUS_JSON" >/dev/null 2>&1; then
+if wait_for_service_ready "$STATUS_JSON"; then
+  pass "/api/status reached readiness before active audio tests"
+else
+  fail "/api/status did not become ready before active audio tests"
+fi
+
+section "Baseline service status"
+if [[ -s "$STATUS_JSON" ]] && python3 -m json.tool "$STATUS_JSON" >/dev/null 2>&1; then
   pass "/api/status returned JSON"
 else
-  fail "/api/status did not return parseable JSON"
+  fail "/api/status did not return parseable JSON after readiness wait"
 fi
 if [[ "$(json_get "$STATUS_JSON" decoder.running)" == "true" ]]; then
   pass "ADS-B decoder is running before active audio tests"

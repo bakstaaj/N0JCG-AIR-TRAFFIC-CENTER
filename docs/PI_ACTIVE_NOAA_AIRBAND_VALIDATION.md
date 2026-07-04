@@ -31,3 +31,7 @@ The active Airband validator must not fail only because `/api/airband/channels` 
 ## Recoverable Airband capture misses
 
 Fast-spectrum validation may encounter candidate carriers whose short AM validation capture returns no samples. When the scanner remains active, these are treated as warnings, not fatal failures. Fatal scanner exceptions still use `airband_scan_error` and fail validation. See `docs/PI_AIRBAND_RECOVERABLE_CAPTURE_WARNINGS.md`.
+
+## Service readiness after restart
+
+The active NOAA/Airband validator waits for `/api/status` to become reachable and parseable before starting control tests. This prevents a freshly restarted systemd service from producing false failures during the short connection-refused startup window.

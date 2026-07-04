@@ -264,3 +264,4 @@ Release checkpoint scripts must update README/release/validation documentation f
 ## Airband scanner recoverable warning guardrail
 
 Do not overload fatal status fields with recoverable scanner observations. For Airband scanning, `airband_scan_error` is reserved for fatal scanner failures that move the scanner to `error` or prevent operation. Per-candidate/per-channel audio capture misses while the scan loop remains active must be exposed through warning fields and must be downgraded to WARN in validators.
+- Active service validators that may be run immediately after `systemctl restart` must include an explicit readiness wait for `/api/status` before counting endpoint failures. Connection-refused during startup is a readiness condition, not a feature failure.
