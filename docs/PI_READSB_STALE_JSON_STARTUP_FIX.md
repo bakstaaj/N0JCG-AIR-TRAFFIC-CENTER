@@ -2,25 +2,16 @@
 
 ## Problem
 
-The Pi service can leave `runtime/settings/readsb-json/aircraft.json` behind after a stop or restart. The backend previously treated any readable `aircraft.json` as proof that the decoder was running. That allowed `/api/status` to report a running decoder even though no backend-owned `readsb` process had been launched, leaving ADS-B message counts frozen.
-
-## Evidence
-
-A direct `rtl_adsb -d 2` probe showed live ADS-B frames from FlyCatcher serial `00001090`. Direct app-owned `readsb` probes using serial `00001090` also produced hundreds of messages and aircraft in short runs. The service runtime JSON, however, remained at the old message count, which pointed to stale JSON startup gating rather than RF or hardware failure.
+The Pi backend previously treated any readable `runtime/settings/readsb-json/aircraft.json` as evidence that ADS-B decoding was running.
+After a restart, stale JSON could remain on disk, causing startup to skip launching app-owned `readsb` while `/api/status` still looked superficially healthy.
 
 ## Fix
 
-`PiSerialDecoderManager.is_running()` now reports liveness only when the backend-owned child process exists and is still alive. Status code may still read `aircraft.json` for telemetry, but startup logic must not skip `readsb` launch because a stale JSON file exists.
+The Pi backend now treats only its backend-owned child process as decoder liveness for startup gating.
+Stale JSON can still be read for telemetry, but it cannot prevent `runtime/bin/readsb` from launching.
 
 ## Validation
 
-Run:
+`tools/pi5_validate_readsb_fresh_start.sh` intentionally stops the service, writes a stale JSON sentinel with `messages=3`, restarts the service, waits until `/api/status` exposes the Pi ADS-B decoder contract, verifies the app-owned `readsb` process is running for serial `00001090`, confirms `aircraft.json` was refreshed, and observes ADS-B message counts.
 
-```bash
-cd ~/sdrdev/PI-AIR-TRAFFIC-TRACKER
-git pull --ff-only
-./tools/pi5_validate_readsb_fresh_start.sh
-./tools/pi5_validate_live_functional.sh
-```
-
-The fresh-start validator stops the service, writes a stale JSON sentinel, restarts the service, and confirms that app-owned `runtime/bin/readsb` starts for serial `00001090`.
+The validator has a robust `/api/status` readiness loop. It does not parse empty or transient responses as final failures; it retries until the Pi serial-role and decoder contract is available or the timeout expires.

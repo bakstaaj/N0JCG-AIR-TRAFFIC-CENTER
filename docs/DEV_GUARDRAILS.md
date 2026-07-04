@@ -229,3 +229,7 @@ Hardware role commits must include the evidence source and validator path. A pre
 - Patch scripts that create report or backup directories must ignore their own local artifact roots during preflight clean-tree checks.
 - Add known script-local roots such as `.pi_*_reports/` and `.pi_*_backups/` to `.gitignore` before staging, but do not fail only because the current script created its report directory.
 - Clean-tree checks should still fail on unrelated source, docs, runtime template, or tool changes.
+
+## Fresh-start validator status readiness guardrail
+
+Fresh-start validators that restart the Pi service must wait for a stable, non-empty, parseable `/api/status` response that includes the required Pi contract fields before extracting JSON values. A transient empty response or partially initialized status response must be retried until timeout, not treated as a final source failure. Backend fixes and validator defects must remain separated: if process evidence and later live functional validation pass, repair the validator rather than reworking runtime code.
