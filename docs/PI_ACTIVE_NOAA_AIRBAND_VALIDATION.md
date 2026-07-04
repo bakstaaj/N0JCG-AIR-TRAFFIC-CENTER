@@ -27,3 +27,7 @@ The validator temporarily switches Airband scan mode to `traditional` so it does
 ## Fast-spectrum fallback for empty FAA catalog
 
 The active Airband validator must not fail only because `/api/airband/channels` is empty. Traditional scanning requires nearby FAA catalog channels, but the application default `fast_spectrum` mode can scan unlisted 120-130 MHz channels without catalog data. When the catalog returns zero nearby channels, the validator records a warning and validates Airband scanner start/stop using fast-spectrum mode.
+
+## Recoverable Airband capture misses
+
+Fast-spectrum validation may encounter candidate carriers whose short AM validation capture returns no samples. When the scanner remains active, these are treated as warnings, not fatal failures. Fatal scanner exceptions still use `airband_scan_error` and fail validation. See `docs/PI_AIRBAND_RECOVERABLE_CAPTURE_WARNINGS.md`.

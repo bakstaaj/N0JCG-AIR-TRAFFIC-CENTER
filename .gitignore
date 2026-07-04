@@ -106,3 +106,5 @@ runtime/logs/
 .pi_active_validation_patch_backups/
 .pi_airband_catalog_patch_reports/
 .pi_airband_catalog_patch_backups/
+.pi_airband_recoverable_patch_reports/
+.pi_airband_recoverable_patch_backups/

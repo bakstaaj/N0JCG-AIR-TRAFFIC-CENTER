@@ -260,3 +260,7 @@ Patch scripts must stage explicit intended files and must not fail only because 
 ## Release checkpoint and tag guardrail
 
 Release checkpoint scripts must update README/release/validation documentation from the validated runtime state, then run repository validation before commit, push, or tag creation. Tags must never be created before validation and commit succeed. If a requested tag already exists remotely, the script must not delete or overwrite it automatically; it should warn and skip or require an explicit new tag name.
+
+## Airband scanner recoverable warning guardrail
+
+Do not overload fatal status fields with recoverable scanner observations. For Airband scanning, `airband_scan_error` is reserved for fatal scanner failures that move the scanner to `error` or prevent operation. Per-candidate/per-channel audio capture misses while the scan loop remains active must be exposed through warning fields and must be downgraded to WARN in validators.

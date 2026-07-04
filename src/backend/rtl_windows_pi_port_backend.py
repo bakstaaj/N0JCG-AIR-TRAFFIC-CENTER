@@ -964,6 +964,9 @@ class AirbandScanPort:
                 "airband_last_detection": None,
                 "airband_scan_scope": scope,
                 "airband_scan_error": None,
+                "airband_scan_warning": None,
+                "airband_last_warning": None,
+                "airband_recoverable_capture_errors": 0,
                 "airband_hold_active": False,
                 "airband_hold_channel": None,
                 "airband_hold_quiet_seconds": 0.0,
@@ -1122,8 +1125,15 @@ class AirbandScanPort:
                     except Exception as exc:
                         if self.stop_event.is_set():
                             break
+                        # Per-candidate audio capture misses are recoverable in scanner mode.
+                        # Keep the scan alive and expose them as warnings instead of fatal errors.
                         with self.lock:
-                            self.state["airband_scan_error"] = str(exc)
+                            warning = str(exc)
+                            self.state["airband_scan_warning"] = warning
+                            self.state["airband_last_warning"] = warning
+                            self.state["airband_recoverable_capture_errors"] = int(
+                                self.state.get("airband_recoverable_capture_errors", 0) or 0
+                            ) + 1
                         continue
                     candidate = {
                         "channel": {key: value for key, value in channel.items() if key != "_native"},
@@ -1141,6 +1151,7 @@ class AirbandScanPort:
                         self.state["airband_current_channel"] = candidate["channel"]
                         self.state["airband_last_measurement_dbfs"] = round(rms, 2)
                         self.state["airband_last_signal_snr_db"] = spectrum_candidate["spectrum_margin_db"]
+                        self.state["airband_scan_warning"] = None
                         if rms > self.best_rms:
                             self.best_rms = rms
                             self.best_audio = wav_content
@@ -1188,8 +1199,14 @@ class AirbandScanPort:
                     except Exception as exc:
                         if self.stop_event.is_set():
                             break
+                        # Per-channel capture misses are recoverable while the scanner continues.
                         with self.lock:
-                            self.state["airband_scan_error"] = str(exc)
+                            warning = str(exc)
+                            self.state["airband_scan_warning"] = warning
+                            self.state["airband_last_warning"] = warning
+                            self.state["airband_recoverable_capture_errors"] = int(
+                                self.state.get("airband_recoverable_capture_errors", 0) or 0
+                            ) + 1
                         time.sleep(0.1)
                         continue
                     candidate = {
@@ -1205,6 +1222,7 @@ class AirbandScanPort:
                         self.state["airband_current_channel"] = candidate["channel"]
                         self.state["airband_last_measurement_dbfs"] = round(rms, 2)
                         self.state["airband_last_signal_snr_db"] = None
+                        self.state["airband_scan_warning"] = None
                         if rms > self.best_rms:
                             self.best_rms = rms
                             self.best_audio = wav_content

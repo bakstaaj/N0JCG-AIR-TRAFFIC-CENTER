@@ -298,10 +298,19 @@ for attempt in $(seq 1 20); do
     scanned="$(json_get "$SCAN_STATUS_JSON" airband_channels_scanned)"
     hold="$(json_get "$SCAN_STATUS_JSON" airband_hold_active)"
     err="$(json_get "$SCAN_STATUS_JSON" airband_scan_error)"
-    log "AIRBAND_STATUS_ATTEMPT=$attempt RUNNING=$running STATE=$state SCANNED=${scanned:-0} HOLD=$hold ERROR=${err:-}"
+    warning="$(json_get "$SCAN_STATUS_JSON" airband_scan_warning)"
+    recoverable_errors="$(json_get "$SCAN_STATUS_JSON" airband_recoverable_capture_errors)"
+    log "AIRBAND_STATUS_ATTEMPT=$attempt RUNNING=$running STATE=$state SCANNED=${scanned:-0} HOLD=$hold ERROR=${err:-} WARNING=${warning:-} RECOVERABLE_CAPTURE_ERRORS=${recoverable_errors:-0}"
     if [[ -n "$err" && "$err" != "None" ]]; then
-      fail "Airband scan reported error: $err"
-      break
+      if [[ "$running" == "true" && ( "$state" == "spectrum_searching" || "$state" == "searching" ) && "$err" == *"Audio capture ended before samples were received"* ]]; then
+        warn "Airband scanner reported recoverable capture miss while still active: $err"
+      else
+        fail "Airband scan reported fatal error: $err"
+        break
+      fi
+    fi
+    if [[ -n "$warning" && "$warning" != "None" ]]; then
+      warn "Airband scanner warning while active: $warning"
     fi
     if [[ "$running" == "true" && "$state" != "stopped" ]]; then
       state_seen=1
