@@ -89,3 +89,5 @@ runtime/logs/
 .pi_status_roles_patch_backups/
 .pi_status_roles_commit_push_reports/
 .pi_status_roles_commit_push_backups/
+.pi_service_smoke_patch_reports/
+.pi_service_smoke_patch_backups/

@@ -198,3 +198,10 @@ Hardware role commits must include the evidence source and validator path. A pre
 - Before staged whitespace validation, normalize touched text files so they use LF line endings, no trailing whitespace, and exactly one final newline with no blank line at EOF.
 - If a script creates local report or backup directories, add them to `.gitignore` before repository cleanliness or push validation.
 - When a patch script intentionally leaves changes uncommitted or unpushed, it must say so explicitly in the final output.
+
+## Pi service and UI smoke-test guardrails
+- Validate the Pi web/API runtime in foreground/dev mode before installing or changing systemd service behavior.
+- Pi service installers must disable the distro `readsb.service` so it cannot own the ADS-B receiver; the app backend starts app-owned `runtime/bin/readsb`.
+- Systemd service units for the Pi tracker must run from the checked-out repo root, set `RTL_ADSB_TRACKER_RUNTIME` to the repo `runtime` directory, and expose the web UI on `0.0.0.0:8090` by default.
+- Service and smoke validators must prove `/api/status`, `/api/aircraft.json`, `/`, `/app.js`, and `/app.css` respond before declaring PASS.
+- Patch scripts that include push must only push after repo validation, staged whitespace validation, commit success, and a clean post-commit state.
