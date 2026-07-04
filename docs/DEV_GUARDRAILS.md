@@ -233,3 +233,11 @@ Hardware role commits must include the evidence source and validator path. A pre
 ## Fresh-start validator status readiness guardrail
 
 Fresh-start validators that restart the Pi service must wait for a stable, non-empty, parseable `/api/status` response that includes the required Pi contract fields before extracting JSON values. A transient empty response or partially initialized status response must be retried until timeout, not treated as a final source failure. Backend fixes and validator defects must remain separated: if process evidence and later live functional validation pass, repair the validator rather than reworking runtime code.
+
+## Pi active NOAA/Airband validation guardrail
+
+Active audio validation must be handled as an operational test, not a pure API smoke test. Scripts may start and stop NOAA live audio and Airband scanning, but they must restore settings where practical, stop shared-audio modes on exit, and treat live Airband voice hits as conditional RF events. Required Airband validation is scanner start, observable active/searching/scanning state, and clean stop; held-channel audio and skip/block controls are PASS when available and WARN when no live transmission is captured.
+
+## Patch script cleanliness guardrail
+
+Patch/recovery scripts must not fail merely because unrelated untracked local artifacts exist, including generated report folders, backup folders, runtime/preflight outputs, or accidental scratch files from earlier validation runs. Scripts must stage explicit path lists, warn about unrelated untracked files that are left untouched, and fail only on unexpected tracked/staged changes outside the patch's intended file set. Report directories created by the current script must be ignored or created after the cleanliness decision so the script never fails on its own output.

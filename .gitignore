@@ -100,3 +100,7 @@ runtime/logs/
 
 .pi_readsb_fresh_validator_patch_reports/
 .pi_readsb_fresh_validator_patch_backups/
+
+# PI active validation local reports
+.pi_active_validation_patch_reports/
+.pi_active_validation_patch_backups/
