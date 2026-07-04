@@ -48,3 +48,24 @@ The validator checks:
 ## Runtime state
 
 This milestone does not start or enable a persistent UAT decoder service. The `/api/status` role contract should continue reporting UAT serial `00000978` as disabled until the backend service integration milestone.
+
+## Startup probe timeout classification
+
+`tools/pi5_validate_uat_decoder_tooling.sh` starts `runtime/bin/dump978-fa`
+under `timeout` for a short non-persistent SDR-open probe. Exit code 124 from
+`timeout` is expected when `dump978-fa` successfully opens the UAT receiver and
+keeps running until the validator stops it.
+
+The validator should fail only on known fatal startup/configuration patterns
+such as missing devices, permission problems, busy receivers, or failed SDR-open
+messages. Generic log words such as `error` are not sufficient by themselves,
+because long-running SDR programs can print normal shutdown/error-handler text
+when `timeout` sends SIGTERM.
+## Startup timeout classifier
+
+The UAT decoder tooling validator intentionally runs `dump978-fa` under a short timeout.  Exit code `124` from GNU `timeout` is treated as success when no strong pre-timeout startup/configuration errors are present, because a persistent decoder should continue running until stopped.
+
+
+## Validator classifier note
+
+For the non-persistent `dump978-fa` startup probe, `timeout` exit code 124 is a pass condition. It means the decoder stayed alive until the validator deliberately stopped it. The validator must classify 124 before broad shutdown-log scanning, because a controlled stop can emit generic text that is not a startup or SDR-open failure.

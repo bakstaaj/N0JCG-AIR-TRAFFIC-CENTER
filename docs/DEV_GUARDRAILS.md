@@ -286,3 +286,15 @@ Do not fail a UAT hardware milestone from a single `rtl_sdr` option combination.
 ## UAT decoder tooling guardrail
 
 Do not enable a persistent UAT 978 MHz decoder service until the app-owned decoder binary is installed, the UAT serial opens through SoapySDR by EEPROM serial, and the existing V0.1 ADS-B/NOAA/Airband acceptance suite remains green. UAT patch milestones must keep serial `00000978` isolated from the running ADS-B and audio receivers.
+
+## UAT dump978 validator timeout guardrail
+
+For non-persistent decoder startup probes, `timeout` exit code 124 can mean the
+receiver opened successfully and the decoder stayed alive until the validator
+stopped it. Do not classify rc=124 as a startup failure unless the captured log
+also contains a known fatal SDR/configuration pattern.
+- UAT `dump978-fa` startup validators must classify GNU `timeout` exit code 124 as success before broad log scanning, unless a strong pre-timeout SDR/configuration error is present.
+
+### dump978 timeout classifier guardrail
+- In non-persistent UAT decoder probes, `timeout` exit code 124 is success when `dump978-fa` stays alive until the controlled stop.
+- Classify rc=124 before broad log scanning; shutdown logs can include generic error text even when SDR startup succeeded.

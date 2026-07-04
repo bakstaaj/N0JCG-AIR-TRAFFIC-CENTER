@@ -195,15 +195,20 @@ fi
 section "dump978-fa SDR startup probe"
 if [[ -x "$DUMP978_BIN" ]]; then
   START_LOG="$WORK_DIR/dump978_startup_probe.log"
-  # Timeout is success for this non-persistent probe: the process stayed alive until we stopped it.
-  timeout 10 "$DUMP978_BIN" --sdr "driver=rtlsdr,serial=${UAT_SERIAL}" --sdr-gain "$UAT_GAIN_DB" --json-stdout >"$WORK_DIR/dump978_startup_probe.stdout" 2>"$START_LOG"
+  START_STDOUT="$WORK_DIR/dump978_startup_probe.stdout"
+  # Timeout rc 124 is success for this non-persistent probe: dump978-fa stayed alive
+  # until the validator deliberately stopped it. Classify rc=124 before scanning
+  # shutdown logs because a controlled SIGTERM can emit generic "error" text.
+  timeout 10 "$DUMP978_BIN" --sdr "driver=rtlsdr,serial=${UAT_SERIAL}" --sdr-gain "$UAT_GAIN_DB" --json-stdout >"$START_STDOUT" 2>"$START_LOG"
   rc=$?
   cat "$START_LOG" | tee -a "$REPORT_PATH" >/dev/null
   log "DUMP978_STARTUP_RC=$rc"
-  if grep -qiE 'Configuration error|Uncaught exception|No matching devices|not found|failed|error' "$START_LOG"; then
+  if [[ "$rc" -eq 124 ]]; then
+    pass "controlled timeout stopped dump978-fa after successful SDR startup"
+  elif grep -qiE 'Configuration error|Uncaught exception|No matching devices|Failed to open|failed to open|Device or resource busy|Permission denied|SoapySDR.*(not found|failed)|rtlsdr.*(not found|failed)' "$START_LOG"; then
     fail "dump978-fa reported a startup/configuration error while opening UAT receiver"
-  elif [[ "$rc" -eq 124 || "$rc" -eq 0 || "$rc" -eq 1 ]]; then
-    pass "dump978-fa startup probe opened or stayed active long enough for a controlled stop"
+  elif [[ "$rc" -eq 0 || "$rc" -eq 1 ]]; then
+    pass "dump978-fa startup probe opened or exited without a classified startup/configuration error"
   else
     warn "dump978-fa startup probe returned unexpected rc=$rc; inspect $START_LOG"
   fi
