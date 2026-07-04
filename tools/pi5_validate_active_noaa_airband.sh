@@ -243,26 +243,35 @@ else
 fi
 
 CHANNELS_JSON="$WORK_DIR/airband_channels.json"
+AIRBAND_VALIDATION_MODE="fast_spectrum"
 if curl_json_get "/api/airband/channels" "$CHANNELS_JSON" && python3 -m json.tool "$CHANNELS_JSON" >/dev/null 2>&1; then
   channel_count="$(json_size "$CHANNELS_JSON" channels)"
   log "AIRBAND_CHANNEL_COUNT=$channel_count"
   if [[ "$channel_count" -gt 0 ]]; then
     pass "Airband nearby channel list contains ${channel_count} channel(s)"
+    AIRBAND_VALIDATION_MODE="traditional"
   else
-    fail "Airband nearby channel list is empty"
+    warn "Airband nearby channel list is empty; validating active scanner with fast_spectrum unlisted-frequency mode"
+    AIRBAND_VALIDATION_MODE="fast_spectrum"
   fi
 else
   fail "Airband channel endpoint did not return parseable JSON"
 fi
 
-# Traditional mode validates the active scanner path without requiring rtl_power availability.
-TUNING_PAYLOAD='{"airband_search_mode":"traditional","airband_activity_threshold_rms":1300,"airband_rf_gain_db":40.2}'
-TUNING_JSON="$WORK_DIR/airband_tuning_traditional.json"
+# Use traditional mode when the FAA catalog provides nearby channels.  If the
+# catalog is missing/empty, keep validation useful by exercising fast_spectrum,
+# which can scan unlisted 120-130 MHz channels without catalog data.
+if [[ "$AIRBAND_VALIDATION_MODE" == "traditional" ]]; then
+  TUNING_PAYLOAD='{"airband_search_mode":"traditional","airband_activity_threshold_rms":1300,"airband_rf_gain_db":40.2}'
+else
+  TUNING_PAYLOAD='{"airband_search_mode":"fast_spectrum","airband_activity_threshold_rms":1300,"airband_rf_gain_db":40.2,"airband_spectrum_margin_db":8}'
+fi
+TUNING_JSON="$WORK_DIR/airband_tuning_${AIRBAND_VALIDATION_MODE}.json"
 if curl_json_post "/api/settings/airband-scan" "$TUNING_PAYLOAD" "$TUNING_JSON" && python3 -m json.tool "$TUNING_JSON" >/dev/null 2>&1; then
-  if [[ "$(json_get "$TUNING_JSON" airband_search_mode)" == "traditional" ]]; then
-    pass "Airband tuning set to traditional scanner mode for active validation"
+  if [[ "$(json_get "$TUNING_JSON" airband_search_mode)" == "$AIRBAND_VALIDATION_MODE" ]]; then
+    pass "Airband tuning set to ${AIRBAND_VALIDATION_MODE} scanner mode for active validation"
   else
-    fail "Airband tuning did not switch to traditional mode"
+    fail "Airband tuning did not switch to ${AIRBAND_VALIDATION_MODE} mode"
   fi
 else
   fail "Airband tuning update failed"

@@ -248,3 +248,11 @@ Patch/recovery scripts must not fail merely because unrelated untracked local ar
 - Active Airband scanner validators must check `/api/airband/channels` before starting the scanner. If the channel list is empty, fail with an actionable catalog-import prerequisite instead of treating it as an SDR/audio failure.
 - Use `tools/pi5_import_faa_airband_catalog.sh` to import a FAA FRQ CSV ZIP and restart/revalidate the service. Use `tools/pi5_validate_airband_catalog.sh` before active Airband scanner validation.
 - Patch scripts must ignore unrelated untracked local artifacts and known report/backup directories during preflight; they must stage explicit intended paths only and fail only on unexpected tracked/staged changes outside the patch set.
+
+## Active Airband validator catalog guardrail
+
+Active Airband validation must match the supported runtime modes. Do not force traditional catalog-based scanning when `/api/airband/channels` is empty. Treat an empty nearby FAA catalog as a warning for catalog/list validation, then validate scanner start/stop through `fast_spectrum`, which is the Pi default and can operate on unlisted 120-130 MHz channels.
+
+## Patch clean-tree guardrail for local artifacts
+
+Patch scripts must stage explicit intended files and must not fail only because unrelated untracked local artifacts exist, including report directories, backup directories, scratch files, or accidental numeric filenames. Warn about unrelated untracked paths, ignore them for patch cleanliness, and fail only on unexpected tracked/staged changes outside the patch set.
