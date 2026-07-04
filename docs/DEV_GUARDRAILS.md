@@ -143,3 +143,20 @@ If `git diff --cached --check` fails after a generated patch, do not visually in
 - On Windows/MSYS2, do not rely on `chmod +x` alone for Git mode changes; use `git update-index --chmod=+x <path>` for tracked executable scripts.
 - Validate executable mode with `git ls-files -s -- <path>` and treat any mode other than `100755` as a FAIL before commit.
 - A Raspberry Pi `Permission denied` on a repo script can be worked around immediately with `bash ./tools/name.sh`, but the repo must still be fixed so future pulls execute directly.
+
+## Pi 5 FlyCatcher Serial Mapping Guardrail
+
+The Pi 5 FlyCatcher/NESDR target should use stable EEPROM serials for receiver roles after live enumeration confirms them: NESDR Nano2+ NOAA/Airband serial 00000162, FlyCatcher ADS-B serial 00001090, and FlyCatcher UAT serial 00000978. Do not hard-code RTL indexes in backend code; resolve runtime indexes from serials during startup and keep UAT disabled until that milestone is explicitly enabled. If EEPROM serials are changed, rerun the Pi serial mapping validator before patching backend ownership.
+
+## Hardware Mapping Evidence Guardrail
+
+Hardware role commits must include the evidence source and validator path. A preflight that previously saw duplicate FlyCatcher serials must be superseded by a new serial-validation run before backend mapping is changed.
+
+## Pi Validator Executable Mode Recovery
+
+- MSYS2 executable-mode recovery for newly added Pi validator scripts: when a new
+  Pi tool is meant to run as `./tools/name.sh`, force the executable bit into
+  Git's index with `git update-index --chmod=+x tools/name.sh` before validating
+  the staged mode.
+- Validate the mode from Git's staged index with `git ls-files -s -- tools/name.sh`;
+  do not rely only on the Windows/MSYS2 filesystem mode.

@@ -74,3 +74,5 @@ __pycache__/
 .pi_runtime_dependency_recovery_backups/
 .pi_runtime_dependency_recovery_reports/
 .exec_bit_fix_backups/
+.serial_mapping_reports/
+runtime/preflight/
