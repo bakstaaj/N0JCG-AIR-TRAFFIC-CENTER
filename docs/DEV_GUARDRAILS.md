@@ -130,3 +130,16 @@ If `git diff --cached --check` fails after a generated patch, do not visually in
 - Prefer `git ls-files` for tracked source validation, plus explicit known new files created by the current patch, instead of broad `find .` scans.
 - JSON validation must run one file at a time with `python3 -m json.tool <file>`; do not pass multiple JSON files to a single invocation.
 - Any script that creates local backup/report folders must ignore those folders in `.gitignore` before or alongside the script change.
+
+## Executable Mode Guardrail
+
+- Any repo script intended to be run directly as `./tools/name.sh` on the Raspberry Pi must be committed with executable mode (`100755`).
+- Patch scripts that add new Pi runtime scripts must validate the tracked file mode before committing.
+- If a Pi pull reports `Permission denied` for a repo script, run it once with `bash ./tools/name.sh` as the immediate workaround, then fix and commit the executable bit from the development repo.
+
+## Pi Script Executable Mode Guardrails
+
+- Pi-side tools intended to run as `./tools/name.sh` must be committed with Git mode `100755`.
+- On Windows/MSYS2, do not rely on `chmod +x` alone for Git mode changes; use `git update-index --chmod=+x <path>` for tracked executable scripts.
+- Validate executable mode with `git ls-files -s -- <path>` and treat any mode other than `100755` as a FAIL before commit.
+- A Raspberry Pi `Permission denied` on a repo script can be worked around immediately with `bash ./tools/name.sh`, but the repo must still be fixed so future pulls execute directly.
