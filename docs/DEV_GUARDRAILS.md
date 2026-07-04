@@ -265,3 +265,8 @@ Release checkpoint scripts must update README/release/validation documentation f
 
 Do not overload fatal status fields with recoverable scanner observations. For Airband scanning, `airband_scan_error` is reserved for fatal scanner failures that move the scanner to `error` or prevent operation. Per-candidate/per-channel audio capture misses while the scan loop remains active must be exposed through warning fields and must be downgraded to WARN in validators.
 - Active service validators that may be run immediately after `systemctl restart` must include an explicit readiness wait for `/api/status` before counting endpoint failures. Connection-refused during startup is a readiness condition, not a feature failure.
+
+## Release tag finalization guardrail
+
+- Do not force-move release tags after validation fixes land. If a primary release tag already exists and does not point at the final validated commit, create a successor validated tag instead.
+- Finalizer scripts must fetch tags before deciding whether to create a tag and must stage only explicit documentation/checkpoint files.

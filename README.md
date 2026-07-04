@@ -114,3 +114,7 @@ See `docs/DEV_GUARDRAILS.md` for project workflow rules.
 - `docs/PI_AIRBAND_CATALOG_IMPORT.md`
 - `docs/PI_READSB_STALE_JSON_STARTUP_FIX.md`
 - `docs/DEV_GUARDRAILS.md`
+
+## V0.1 validated Pi initial-port checkpoint
+
+The Raspberry Pi 5 initial port has been validated against live hardware. See `docs/PI_V0_1_VALIDATION_EVIDENCE.md` for the validation evidence and closed issues.
