@@ -168,3 +168,20 @@ Hardware role commits must include the evidence source and validator path. A pre
 - Pi backend autostart must not block the HTTP API while waiting for `aircraft.json`; `readsb` may be healthy before any live ADS-B frames are decoded.
 - Startup validation should treat a live decoder process plus resolved serial roles as sufficient for initial PASS, while separately warning if `aircraft.json` is not present yet.
 - Validators that launch the backend with `--autostart` must allow enough time for serial probing plus decoder process checks before declaring the HTTP port unreachable.
+
+## Pi readsb RTL-SDR Guardrails
+
+- Do not assume the Debian/Raspberry Pi OS `readsb` package can own an RTL-SDR just because `/usr/bin/readsb` exists.
+- Validate RTL-SDR support by checking that `--device-type rtlsdr` is accepted; package builds may list generic RTL-SDR text in usage but still report `SDR type 'rtlsdr' not recognized`.
+- For this Pi 5 FlyCatcher/NESDR target, prefer an app-owned readsb binary under `runtime/bin/readsb` or `bin/readsb`, matching the proven RTL-Pi-ADS-B-TRACKER pattern.
+- Backend code must select the ADS-B receiver by EEPROM serial `00001090`, not by a hard-coded Linux runtime index.
+- Keep the system/package `readsb.service` disabled unless explicitly testing package behavior, so it does not own the ADS-B SDR.
+- If readsb exits before the backend binds HTTP, capture the app-owned readsb log and the backend stdout before changing code.
+
+## App-owned readsb commit recovery
+
+- The Pi Air Traffic Tracker must not rely on Debian-packaged `readsb` unless a validation proves that `--device-type rtlsdr` is recognized.
+- Use the app-owned RTL-SDR-enabled `readsb` binary path first for Pi ADS-B operation.
+- Patch scripts that create tracked source changes must either create the commit themselves after PASS/FAIL validation or clearly state that they intentionally leave changes uncommitted.
+- Before pushing, no tracked patch files should remain unstaged and no intended new tool should remain untracked.
+- New Pi tool scripts intended to run as `./tools/name.sh` must be staged with Git mode `100755` using `git update-index --chmod=+x` when MSYS2 does not preserve executable mode automatically.

@@ -146,24 +146,46 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
         return mapping
 
     def _readsb_path(self) -> str:
-        command = shutil.which("readsb") or shutil.which("dump1090")
-        if not command:
-            raise RuntimeError("Neither readsb nor dump1090 is available in PATH.")
-        self.readsb_command_path = command
-        return command
+        candidates = [
+            self.root / "runtime" / "bin" / "readsb",
+            self.root / "bin" / "readsb",
+            Path("/opt/rtl-pi-adsb-tracker/bin/readsb"),
+        ]
+        for candidate in candidates:
+            if candidate.is_file() and os.access(candidate, os.X_OK):
+                self.readsb_command_path = str(candidate)
+                return str(candidate)
+        if os.environ.get("PI_AIR_TRAFFIC_ALLOW_SYSTEM_READSB", "0") == "1":
+            command = shutil.which("readsb") or shutil.which("dump1090")
+            if command:
+                self.readsb_command_path = command
+                return command
+        raise RuntimeError(
+            "No app-owned RTL-SDR-enabled readsb was found. Run "
+            "tools/pi5_install_app_owned_readsb.sh on the Pi. The Debian package "
+            "readsb can exist but still reject --device-type rtlsdr."
+        )
 
     def _readsb_command(self, adsb_index: int) -> list[str]:
+        del adsb_index
         readsb = self._readsb_path()
         self.json_dir.mkdir(parents=True, exist_ok=True)
+        adsb_gain = os.environ.get("PI_AIR_TRAFFIC_ADSB_GAIN", "-10")
         command = [
             readsb,
             "--device-type", "rtlsdr",
-            "--device", str(adsb_index),
-            "--gain", "48.0",
+            "--device", ADSB_SERIAL,
+            "--gain", adsb_gain,
             "--ppm", "0",
+            "--net",
+            "--net-heartbeat", "60",
+            "--net-ri-port", "30001",
+            "--net-ro-port", "30002",
+            "--net-sbs-port", "30003",
+            "--net-bi-port", "30004",
+            "--net-bo-port", "30005",
             "--write-json", str(self.json_dir),
             "--write-json-every", "1",
-            "--net",
             "--quiet",
         ]
         extra = os.environ.get("PI_AIR_TRAFFIC_READSB_EXTRA_ARGS", "").strip()
