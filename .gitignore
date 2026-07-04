@@ -85,3 +85,7 @@ runtime/preflight/
 .workflow_reports/
 
 runtime/logs/
+.pi_status_roles_patch_reports/
+.pi_status_roles_patch_backups/
+.pi_status_roles_commit_push_reports/
+.pi_status_roles_commit_push_backups/

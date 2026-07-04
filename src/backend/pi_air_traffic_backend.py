@@ -60,6 +60,7 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
         self.aircraft_json_path = self.json_dir / "aircraft.json"
         self.log_path = runtime_root / "logs" / "readsb_adsb_1090.log"
         self.readsb_command_path: str | None = None
+        self.roles: dict[str, Any] = {}
 
     @property
     def decoder_json_url(self) -> str:
@@ -306,6 +307,62 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
         }
 
 
+
+def patch_pi_port_handler_status(pi_port: Any) -> None:
+    """Expose Pi serial receiver ownership through inherited /api/status.
+
+    The ported Windows/Pi handler owns the /api/status route and returns the
+    legacy UI status shape.  The Pi backend shim owns the receiver-role and
+    app-owned readsb contract, so enrich the inherited status response here
+    instead of modifying the shared port baseline module.
+    """
+    original_port_status = pi_port.PiPortHandler.port_status
+    if getattr(original_port_status, "_pi_air_traffic_roles_enriched", False):
+        return
+
+    def pi_air_traffic_port_status(self: Any) -> dict[str, Any]:
+        payload = original_port_status(self)
+        if not isinstance(payload, dict):
+            payload = {}
+
+        roles = getattr(self.manager, "roles", None)
+        if not roles:
+            try:
+                roles = self.manager.resolve_roles()
+            except Exception as exc:  # Keep /api/status available for diagnostics.
+                roles = {"ok": False, "error": str(exc)}
+        payload["receiver_roles"] = roles
+
+        try:
+            manager_status = self.manager.status()
+            if isinstance(manager_status, dict):
+                decoder = manager_status.get("decoder")
+                if isinstance(decoder, dict):
+                    payload["decoder"] = decoder
+                payload["last_error"] = manager_status.get("last_error")
+        except Exception as exc:  # Keep the legacy status usable even if enrichment fails.
+            payload.setdefault("decoder", {
+                "running": bool(self.manager.is_running()),
+                "json_ready": bool(payload.get("readsb_json_available")),
+                "query_error": str(exc),
+            })
+            payload.setdefault("last_error", str(exc))
+
+        payload["pi_backend"] = {
+            "serial_contract": {
+                "adsb_1090": ADSB_SERIAL,
+                "noaa_airband": AUDIO_SERIAL,
+                "uat_978": UAT_SERIAL,
+            },
+            "readsb_command": getattr(self.manager, "readsb_command_path", None) or "readsb",
+            "status_enrichment": "pi_shim_receiver_roles_decoder",
+        }
+        return payload
+
+    setattr(pi_air_traffic_port_status, "_pi_air_traffic_roles_enriched", True)
+    pi_port.PiPortHandler.port_status = pi_air_traffic_port_status
+
+
 def main() -> int:
     # Import after patching rtl_windows_backend globals so the Pi port module gets
     # the Pi serial constants and Linux path handler in its module-level imports.
@@ -315,6 +372,7 @@ def main() -> int:
     pi_port.ADSB_SERIAL = ADSB_SERIAL
     pi_port.AUDIO_SERIAL = AUDIO_SERIAL
     pi_port.windows_path = linux_path
+    patch_pi_port_handler_status(pi_port)
     return pi_port.main()
 
 

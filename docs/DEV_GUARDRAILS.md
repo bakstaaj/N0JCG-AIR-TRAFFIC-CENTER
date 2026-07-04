@@ -185,3 +185,16 @@ Hardware role commits must include the evidence source and validator path. A pre
 - Patch scripts that create tracked source changes must either create the commit themselves after PASS/FAIL validation or clearly state that they intentionally leave changes uncommitted.
 - Before pushing, no tracked patch files should remain unstaged and no intended new tool should remain untracked.
 - New Pi tool scripts intended to run as `./tools/name.sh` must be staged with Git mode `100755` using `git update-index --chmod=+x` when MSYS2 does not preserve executable mode automatically.
+
+## Pi API status contract guardrail
+- When the Pi backend shim adds Pi-specific runtime ownership fields, `/api/status` must expose them through the active HTTP handler, not only through an internal manager method.
+- Keep the Windows/Pi-port baseline module unchanged when practical; prefer Pi-shim monkey patches or wrappers for Pi-specific API contract fields such as `receiver_roles`, `decoder`, app-owned `readsb` path, and serial-role diagnostics.
+- Treat a running decoder and a passing API validator as separate requirements. A healthy `readsb` process is not enough if `/api/status` does not expose the fields that validators and UI code depend on.
+- Recovery scripts for API-contract mismatches must update this guardrail file before or alongside the code fix.
+
+## Patch commit and push guardrail
+- A patch script may include `git push` only after all local validations and the commit step pass.
+- Never push when validation, whitespace checks, executable-mode checks, or commit creation fail.
+- Before staged whitespace validation, normalize touched text files so they use LF line endings, no trailing whitespace, and exactly one final newline with no blank line at EOF.
+- If a script creates local report or backup directories, add them to `.gitignore` before repository cleanliness or push validation.
+- When a patch script intentionally leaves changes uncommitted or unpushed, it must say so explicitly in the final output.
