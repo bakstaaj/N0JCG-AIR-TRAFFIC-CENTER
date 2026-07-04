@@ -80,7 +80,7 @@ import time
 import urllib.request
 port = int("$PORT")
 url = f"http://127.0.0.1:{port}/api/status"
-deadline = time.time() + 20.0
+deadline = time.time() + 60.0
 last_error = None
 while time.time() < deadline:
     try:

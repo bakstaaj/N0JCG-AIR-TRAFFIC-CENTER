@@ -162,3 +162,9 @@ Hardware role commits must include the evidence source and validator path. A pre
   do not rely only on the Windows/MSYS2 filesystem mode.
 
 ## Pi backend serial receiver ownership\n\n- The Pi 5 FlyCatcher/NESDR target owns receivers by stable RTL EEPROM serials: 00001090 for ADS-B 1090, 00000162 for NOAA/Airband, and 00000978 for UAT.\n- Backend code must resolve runtime RTL indexes from serials at startup and must not hard-code indexes.\n- Product labels from rtl_test are diagnostic only after EEPROM serials are assigned; serial ownership is the source of truth.\n- The first Pi backend milestone should add a Pi-specific shim instead of modifying the Windows baseline backend directly.
+
+## Pi Backend Startup Guardrails
+
+- Pi backend autostart must not block the HTTP API while waiting for `aircraft.json`; `readsb` may be healthy before any live ADS-B frames are decoded.
+- Startup validation should treat a live decoder process plus resolved serial roles as sufficient for initial PASS, while separately warning if `aircraft.json` is not present yet.
+- Validators that launch the backend with `--autostart` must allow enough time for serial probing plus decoder process checks before declaring the HTTP port unreachable.

@@ -226,18 +226,24 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
                     text=True,
                 )
                 self.started_at = time.time()
-                deadline = time.time() + 15.0
+                # readsb can stay healthy before aircraft.json exists, especially indoors
+                # or before the first live 1090 MHz frame is decoded. Do not block the
+                # HTTP backend for the full JSON wait during startup; just verify that
+                # the child process survives its immediate option/device checks.
+                deadline = time.time() + 3.0
                 while time.time() < deadline:
                     if self.process.poll() is not None:
                         raise RuntimeError(
                             f"readsb exited during startup with code {self.process.returncode}; see {self.log_path}."
                         )
-                    try:
-                        self.query_aircraft()
-                        return self.status()
-                    except (FileNotFoundError, json.JSONDecodeError, ValueError, URLError):
-                        time.sleep(0.25)
-                LOG.warning("readsb is running but aircraft.json was not available within startup grace period")
+                    if self.aircraft_json_path.is_file():
+                        try:
+                            self.query_aircraft()
+                            return self.status()
+                        except (json.JSONDecodeError, ValueError, URLError):
+                            pass
+                    time.sleep(0.25)
+                LOG.info("readsb is running; aircraft.json is not required before HTTP startup completes")
                 return self.status()
             except Exception as exc:
                 self.last_error = str(exc)

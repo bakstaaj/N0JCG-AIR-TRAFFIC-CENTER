@@ -78,3 +78,5 @@ __pycache__/
 runtime/preflight/
 .pi_backend_serial_patch_reports/
 .pi_backend_serial_patch_backups/
+.pi_backend_startup_wait_fix_reports/
+.pi_backend_startup_wait_fix_backups/
