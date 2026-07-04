@@ -63,3 +63,8 @@ __pycache__/
 
 .executable_bit_fix_backups/
 .exec_bits_json_scope_backups/
+# Local generated validation reports/backups
+.exec_bits_json_scope_reports/
+.pre_hardware_restage_whitespace_reports/
+.report_dir_cleanup_backups/
+.report_dir_cleanup_reports/
