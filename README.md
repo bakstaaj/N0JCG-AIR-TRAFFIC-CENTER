@@ -118,3 +118,21 @@ See `docs/DEV_GUARDRAILS.md` for project workflow rules.
 ## V0.1 validated Pi initial-port checkpoint
 
 The Raspberry Pi 5 initial port has been validated against live hardware. See `docs/PI_V0_1_VALIDATION_EVIDENCE.md` for the validation evidence and closed issues.
+
+<!-- PI_V0_1_ACCEPTANCE_BEGIN -->
+## V0.1 Pi acceptance validation
+
+Run the full hardware acceptance suite on the Raspberry Pi after pulling the latest branch/tag:
+
+```bash
+cd ~/sdrdev/PI-AIR-TRAFFIC-TRACKER
+git pull --ff-only --tags
+./tools/pi5_validate_v0_1_acceptance.sh
+```
+
+The acceptance bundle runs the systemd, ADS-B fresh-start, live functional, and active NOAA/Airband validators and writes one summary report under `runtime/preflight/`.
+
+FAA Airband catalog data is optional for V0.1 fast-spectrum scanning. Traditional nearby-channel scanning requires importing the FAA NASR FRQ CSV ZIP with `tools/pi5_import_faa_airband_catalog.sh`.
+
+See `docs/PI_V0_1_ACCEPTANCE_SUITE.md` for the full acceptance contract.
+<!-- PI_V0_1_ACCEPTANCE_END -->

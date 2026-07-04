@@ -270,3 +270,7 @@ Do not overload fatal status fields with recoverable scanner observations. For A
 
 - Do not force-move release tags after validation fixes land. If a primary release tag already exists and does not point at the final validated commit, create a successor validated tag instead.
 - Finalizer scripts must fetch tags before deciding whether to create a tag and must stage only explicit documentation/checkpoint files.
+
+## Pi V0.1 acceptance bundle guardrail
+
+When a milestone has several hardware validators, add or maintain a single acceptance bundle that runs the required validators and emits one top-level `FINAL: PASS`/`FINAL: FAIL` summary. The bundle may warn on optional runtime data, such as the FAA Airband catalog, but required runtime paths must remain hard failures.
