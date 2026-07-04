@@ -256,3 +256,7 @@ Active Airband validation must match the supported runtime modes. Do not force t
 ## Patch clean-tree guardrail for local artifacts
 
 Patch scripts must stage explicit intended files and must not fail only because unrelated untracked local artifacts exist, including report directories, backup directories, scratch files, or accidental numeric filenames. Warn about unrelated untracked paths, ignore them for patch cleanliness, and fail only on unexpected tracked/staged changes outside the patch set.
+
+## Release checkpoint and tag guardrail
+
+Release checkpoint scripts must update README/release/validation documentation from the validated runtime state, then run repository validation before commit, push, or tag creation. Tags must never be created before validation and commit succeed. If a requested tag already exists remotely, the script must not delete or overwrite it automatically; it should warn and skip or require an explicit new tag name.
