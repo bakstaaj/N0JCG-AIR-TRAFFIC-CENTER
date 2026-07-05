@@ -2374,6 +2374,14 @@ function closeMenu() {
   el('appMenu').classList.remove('open');
   el('menuBackdrop').classList.remove('open');
   el('menuToggle').setAttribute('aria-expanded', 'false');
+  // V0.2 traffic-source controls: resume refresh after the operator closes
+  // the drawer so checkboxes are not fighting the 2-second aircraft/status polls.
+  window.setTimeout(() => {
+    try { updateStatus(); } catch (_) {}
+    try { updateAircraft(); } catch (_) {}
+    try { refreshOperationMenu(); } catch (_) {}
+    try { if (typeof loadTrafficSourceSettings === 'function') loadTrafficSourceSettings(); } catch (_) {}
+  }, 80);
 }
 function toggleMenu() {
   if (el('appMenu').classList.contains('open')) closeMenu(); else openMenu();
@@ -2709,9 +2717,18 @@ document.addEventListener('DOMContentLoaded', () => {
   loadTrailHistoryFromServer();
   updateStatus();
   updateAircraft();
-  window.setInterval(updateStatus, 2000);
-  window.setInterval(updateAircraft, 2000);
-  window.setInterval(refreshOperationMenu, 2500);
+  const refreshWhenMenuClosed = (label, callback) => () => {
+    const menu = el('appMenu');
+    if (menu && menu.classList.contains('open')) {
+      window.__trafficSourceRefreshPaused = {paused: true, label, at: new Date().toISOString()};
+      return;
+    }
+    window.__trafficSourceRefreshPaused = {paused: false, label, at: new Date().toISOString()};
+    return callback();
+  };
+  window.setInterval(refreshWhenMenuClosed('status', updateStatus), 2000);
+  window.setInterval(refreshWhenMenuClosed('aircraft', updateAircraft), 2000);
+  window.setInterval(refreshWhenMenuClosed('operations', refreshOperationMenu), 2500);
   window.setTimeout(startDefaultBackgroundAirband, 900);
 });
 

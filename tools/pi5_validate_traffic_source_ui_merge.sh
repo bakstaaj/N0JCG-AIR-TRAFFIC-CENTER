@@ -97,6 +97,10 @@ grep -q 'trafficSourceUat978' web/index.html && pass "UAT traffic switch exists 
 grep -q '/api/settings/traffic-sources' web/app.js && pass "UI calls traffic source settings API" || fail "UI traffic source API call missing"
 grep -q 'patch_pi_traffic_source_handler' src/backend/pi_air_traffic_backend.py && pass "Pi backend traffic source patch is installed" || fail "backend traffic source patch missing"
 grep -q 'merged_aircraft_payload' src/backend/pi_air_traffic_backend.py && pass "backend merged aircraft payload is installed" || fail "merged aircraft payload missing"
+grep -q '__trafficSourceRefreshPaused' web/app.js && pass "UI pauses refresh while menu drawer is open" || fail "UI refresh pause marker missing"
+grep -q 'cannot read from timed out object' src/backend/pi_air_traffic_backend.py && pass "UAT collector handles idle timed-out object reads" || fail "UAT collector timed-out object handling missing"
+grep -q 'Refresh pause while menu is open' docs/guardrails/PI_TRAFFIC_SOURCE_MERGE_GUARDRAIL.md && pass "guardrail documents menu refresh pause" || fail "guardrail missing menu refresh pause rule"
+grep -q 'UAT idle collector timeout' docs/guardrails/PI_TRAFFIC_SOURCE_MERGE_GUARDRAIL.md && pass "guardrail documents UAT idle timeout handling" || fail "guardrail missing UAT idle timeout rule"
 
 section "Service status"
 if systemctl is-active --quiet pi-air-traffic-tracker.service; then

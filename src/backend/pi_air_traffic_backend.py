@@ -475,8 +475,16 @@ class PiUat978Manager:
                     while not self.stop_event.is_set() and self.is_running():
                         try:
                             line = stream.readline()
-                        except socket.timeout:
-                            continue
+                        except (socket.timeout, TimeoutError, OSError) as exc:
+                            # Python's socket.makefile().readline() can raise
+                            # OSError("cannot read from timed out object") after a
+                            # normal idle socket timeout. Treat that as no-data-yet,
+                            # not a collector failure. Other OSError values still
+                            # reconnect through the outer exception handler.
+                            if isinstance(exc, (socket.timeout, TimeoutError)) or "timed out" in str(exc).lower():
+                                self.collector_error = None
+                                continue
+                            raise
                         if not line:
                             break
                         line = line.strip()

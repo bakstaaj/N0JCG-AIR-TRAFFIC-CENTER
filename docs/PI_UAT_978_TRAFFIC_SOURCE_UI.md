@@ -28,3 +28,12 @@ Merge rules:
 - UAT 978 remains disabled by default until the operator turns it on.
 - UAT still uses app-owned `runtime/bin/dump978-fa`.
 - No separate persistent systemd service is introduced for UAT in this milestone.
+
+
+## Menu refresh pause
+
+The Configuration drawer is an operator edit surface. Browser status, aircraft, and operations polling pauses while the menu drawer is open, then refreshes once after the drawer closes. This prevents the 2-second refresh loop from fighting checkbox changes while enabling or disabling 1090 ADS-B and 978 UAT.
+
+## UAT idle collector timeout handling
+
+The dump978 JSON collector treats idle socket/readline timeouts, including Python's `cannot read from timed out object`, as no-data-yet rather than a collector error. Live 978 traffic may be absent, but an idle collector should stay healthy and show zero UAT aircraft instead of surfacing timeout noise.

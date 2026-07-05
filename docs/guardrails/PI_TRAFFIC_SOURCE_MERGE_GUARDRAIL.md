@@ -25,3 +25,13 @@ initializing after systemd reports the process active.
 Any validator that restarts `pi-air-traffic-tracker.service` or validates newly-added API endpoints must wait for the HTTP API to return valid JSON from `/api/status` before testing feature endpoints. systemctl is-active alone is not sufficient because the service can be active before the Python HTTP server has bound port 8090.
 
 If HTTP readiness fails, the validator must capture useful startup evidence, including `systemctl status pi-air-traffic-tracker.service` and recent `journalctl -u pi-air-traffic-tracker.service` output, before returning `FINAL: FAIL`.
+
+
+## Refresh pause while menu is open
+
+Browser polling must pause while the menu drawer is open. Traffic-source checkboxes are operator controls, and periodic status or aircraft refreshes must not overwrite in-progress switch changes. Refresh may resume immediately after the menu closes.
+
+
+## UAT idle collector timeout
+
+The 978 UAT JSON collector must treat idle socket/readline timeouts, including the exact phrase `cannot read from timed out object`, as no-data-yet. A quiet UAT channel is not a collector failure.
