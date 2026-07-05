@@ -2259,11 +2259,10 @@ async function pollExperimentalScan() {
     }
     const channel = status.airband_current_channel;
     if (status.airband_hold_active) {
-      const held = status.airband_hold_channel || channel || {};
       setMessage(
         'airbandScanStatus',
-        `HOLD ${Number(held.frequency_mhz).toFixed(3)} MHz AM; live audio active; RMS ${Number(status.airband_hold_rms_sample || 0).toFixed(1)}; quiet ${Number(status.airband_hold_quiet_seconds || 0).toFixed(1)}/7.0 sec.`,
-        'good'
+        formatAirbandHoldScannerMessage(status),
+        status.airband_squelch_state === 'closed' ? 'warning' : 'good'
       );
     } else if (status.airband_search_mode === 'fast_spectrum') {
       const bestCarrier = status.airband_spectrum_best_frequency_hz == null
@@ -2481,6 +2480,24 @@ function updateAirbandTuningDetail(airband, noaaActive) {
   }
 }
 
+// AIRBAND_NORMAL_SCANNER_SQUELCH_UI_V2: UI displays squelch OPEN/CLOSED state, quiet timer, and remaining release time.
+function formatAirbandHoldScannerMessage(status) {
+  const held = status.airband_hold_channel || status.airband_current_channel || {};
+  const freq = Number.isFinite(Number(held.frequency_mhz)) ? `${Number(held.frequency_mhz).toFixed(3)} MHz` : 'held channel';
+  const squelch = Number(status.airband_playback_squelch_rms || 0);
+  const squelchLabel = squelch <= 0 ? 'squelch off/open' : `squelch ${squelch.toFixed(0)} RMS`;
+  const rms = status.airband_hold_rms_sample == null ? '—' : Number(status.airband_hold_rms_sample).toFixed(1);
+  const state = status.airband_squelch_state || (status.airband_playback_squelch_muted ? 'closed' : 'open');
+  const quiet = Number(status.airband_hold_quiet_seconds || 0);
+  const remaining = status.airband_hold_release_remaining_seconds == null
+    ? Math.max(0, 7 - quiet)
+    : Number(status.airband_hold_release_remaining_seconds);
+  const action = state === 'open'
+    ? 'timer reset'
+    : `resume scan in ${remaining.toFixed(1)}s`;
+  return `HOLD ${freq} AM · ${state.toUpperCase()} · ${squelchLabel} · RMS ${rms} · quiet ${quiet.toFixed(1)}/7.0s · ${action}`;
+}
+
 async function refreshOperationMenu() {
   try {
     const status = requireObjectResponse(await jsonRequest('/api/status'), 'Receiver status');
@@ -2499,7 +2516,15 @@ async function refreshOperationMenu() {
     el('airbandMenuToggle').textContent = airbandActive ? 'Stop Airband Scanner' : 'Start Airband Scanner';
     el('airbandMenuToggle').className = airbandActive ? 'stop' : '';
 
-    if (operationTransitionActive || airband.airband_hold_active) return;
+    if (operationTransitionActive) return;
+    if (airband.airband_hold_active) {
+      setMessage(
+        'operationsMessage',
+        formatAirbandHoldScannerMessage(airband),
+        airband.airband_squelch_state === 'closed' ? 'warning' : 'good'
+      );
+      return;
+    }
     if (noaaBackendActive && !noaaBrowserPlaying) {
       setMessage('operationsMessage', 'NOAA receiver is active, but browser audio is not connected. Click Reconnect NOAA Audio.', 'warning');
     } else if (noaaActive) {

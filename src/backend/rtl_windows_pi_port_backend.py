@@ -88,6 +88,7 @@ AIRBAND_HOLD_TIMER_SQUELCH_V1 = True
 AIRBAND_HOLD_RELEASE_SECONDS = float(os.environ.get("PI_AIR_TRAFFIC_AIRBAND_HOLD_RELEASE_SECONDS", "7.0"))
 AIRBAND_HOLD_CHUNK_TIMEOUT_SECONDS = float(os.environ.get("PI_AIR_TRAFFIC_AIRBAND_HOLD_CHUNK_TIMEOUT_SECONDS", "1.0"))
 AIRBAND_HOLD_NO_CHUNK_SLEEP_SECONDS = float(os.environ.get("PI_AIR_TRAFFIC_AIRBAND_HOLD_NO_CHUNK_SLEEP_SECONDS", "0.15"))
+AIRBAND_NORMAL_SCANNER_SQUELCH_V1 = True
 
 # PI_SHARED_AUDIO_SDR_HARDENING_V1:
 # NOAA live audio, Airband live hold audio, and Airband fast-spectrum scans
@@ -900,7 +901,7 @@ class AirbandScanPort:
         self.last_audio: bytes | None = None
         self.best_audio: bytes | None = None
         self.best_rms = 0.0
-        self.hold_last_audible_monotonic = 0.0
+        self.hold_last_open_monotonic = 0.0
         self.hold_last_timer_reset_source = "none"
 
     @staticmethod
@@ -1068,6 +1069,9 @@ class AirbandScanPort:
                 "airband_hold_channel": None,
                 "airband_hold_quiet_seconds": 0.0,
                 "airband_hold_release_reason": None,
+                "airband_squelch_open": False,
+                "airband_squelch_state": "closed",
+                "airband_hold_release_remaining_seconds": AIRBAND_HOLD_RELEASE_SECONDS,
                 "airband_hold_quiet_threshold_rms": None,
                 "airband_hold_timer_reset_source": None,
                 "airband_playback_squelch_muted": False,
@@ -1108,29 +1112,39 @@ class AirbandScanPort:
             return wav_file.getnframes() / float(max(1, wav_file.getframerate()))
 
     def _hold_quiet_threshold_rms(self) -> float:
-        # AIRBAND_HOLD_TIMER_SQUELCH_V1:
-        # Activity threshold decides whether to enter a hold. Playback squelch
-        # decides whether the held channel is still audible enough to keep.
-        # Do not keep using activity_threshold * 0.70 after the operator lowers
-        # playback squelch, because that prevents the 7-second timer from
-        # resetting even though the operator can hear the signal.
-        playback_threshold = float(self.settings.airband_playback_squelch_rms)
-        if playback_threshold > 0.0:
-            return max(0.0, playback_threshold)
-        return 0.0
+        # AIRBAND_NORMAL_SCANNER_SQUELCH_V1:
+        # A normal scanner's playback squelch controls whether the held channel
+        # is open or closed. Activity threshold is only for entering HOLD.
+        # Squelch off/zero means open squelch, so static is valid open audio and
+        # the held channel must not release because of quiet timeout.
+        return max(0.0, float(self.settings.airband_playback_squelch_rms))
+
+    def _set_hold_squelch_state_locked(self, open_state: bool, rms: float | None, source: str, now: float | None = None) -> float:
+        now = time.monotonic() if now is None else now
+        threshold = self._hold_quiet_threshold_rms()
+        if open_state:
+            self.hold_last_open_monotonic = now
+            self.hold_last_timer_reset_source = source
+        quiet_seconds = 0.0 if open_state else max(0.0, now - self.hold_last_open_monotonic)
+        remaining = max(0.0, AIRBAND_HOLD_RELEASE_SECONDS - quiet_seconds)
+        self.state["airband_squelch_open"] = bool(open_state)
+        self.state["airband_squelch_state"] = "open" if open_state else "closed"
+        self.state["airband_hold_quiet_seconds"] = round(quiet_seconds, 2)
+        self.state["airband_hold_release_remaining_seconds"] = round(remaining, 2)
+        self.state["airband_hold_quiet_threshold_rms"] = round(threshold, 2)
+        self.state["airband_hold_timer_reset_source"] = source if open_state else self.hold_last_timer_reset_source
+        if rms is not None:
+            self.state["airband_hold_rms_sample"] = round(rms, 2)
+            self.state["airband_last_measurement_dbfs"] = round(rms, 2)
+        return quiet_seconds
 
     def _reset_hold_timer_locked(self, source: str, now: float | None = None) -> None:
-        now = time.monotonic() if now is None else now
-        self.hold_last_audible_monotonic = now
-        self.hold_last_timer_reset_source = source
-        self.state["airband_hold_quiet_seconds"] = 0.0
-        self.state["airband_hold_timer_reset_source"] = source
-        self.state["airband_hold_quiet_threshold_rms"] = round(self._hold_quiet_threshold_rms(), 2)
+        self._set_hold_squelch_state_locked(True, None, source, now)
 
     def note_playback_squelch_changed(self) -> None:
-        # Called after the operator changes playback squelch. If the currently
-        # held audio RMS is above the new hold threshold, immediately reset the
-        # 7-second quiet timer instead of waiting for the next polling chunk.
+        # Lowering squelch while held should immediately reopen/reset the hold
+        # timer when the latest held RMS is above the new squelch, or whenever
+        # squelch is off.
         with self.lock:
             if not self.state.get("airband_hold_active"):
                 return
@@ -1139,9 +1153,8 @@ class AirbandScanPort:
             except (TypeError, ValueError):
                 rms = 0.0
             threshold = self._hold_quiet_threshold_rms()
-            self.state["airband_hold_quiet_threshold_rms"] = round(threshold, 2)
-            if threshold <= 0.0 or rms >= threshold:
-                self._reset_hold_timer_locked("squelch_adjustment")
+            open_state = threshold <= 0.0 or rms >= threshold
+            self._set_hold_squelch_state_locked(open_state, rms, "squelch_adjustment")
 
     def live_playback_chunk(self, after_sequence: int) -> tuple[int, bytes, bool, float] | None:
         # Step 67: live Airband playback squelch RMS gate.
@@ -1159,9 +1172,7 @@ class AirbandScanPort:
             self.state["airband_playback_squelch_muted"] = muted
             self.state["airband_playback_squelch_last_rms"] = rms
             if self.state.get("airband_hold_active"):
-                self.state["airband_hold_quiet_threshold_rms"] = round(self._hold_quiet_threshold_rms(), 2)
-                if not muted:
-                    self._reset_hold_timer_locked("playback_chunk")
+                self._set_hold_squelch_state_locked(not muted, rms, "playback_chunk")
         return sequence, content, muted, rms
 
     def release_held_channel(self, block: bool) -> dict[str, Any]:
@@ -1186,9 +1197,9 @@ class AirbandScanPort:
         now = time.monotonic()
         with self.lock:
             self.hold_identifier += 1
-            self.hold_last_audible_monotonic = now
+            self.hold_last_open_monotonic = now
             self.hold_last_timer_reset_source = "hold_start"
-            quiet_threshold = self._hold_quiet_threshold_rms()
+            threshold = self._hold_quiet_threshold_rms()
             self.state.update({
                 "airband_scan_state": "holding",
                 "airband_hold_active": True,
@@ -1196,8 +1207,11 @@ class AirbandScanPort:
                 "airband_hold_channel": candidate["channel"],
                 "airband_hold_rms_sample": candidate["audio_rms_sample"],
                 "airband_hold_quiet_seconds": 0.0,
-                "airband_hold_quiet_threshold_rms": round(quiet_threshold, 2),
+                "airband_hold_release_remaining_seconds": AIRBAND_HOLD_RELEASE_SECONDS,
+                "airband_hold_quiet_threshold_rms": round(threshold, 2),
                 "airband_hold_timer_reset_source": "hold_start",
+                "airband_squelch_open": True,
+                "airband_squelch_state": "open",
                 "airband_hold_release_reason": None,
             })
         cursor = 0
@@ -1211,30 +1225,32 @@ class AirbandScanPort:
                     timeout_seconds=AIRBAND_HOLD_CHUNK_TIMEOUT_SECONDS,
                 )
                 now = time.monotonic()
+                threshold = self._hold_quiet_threshold_rms()
+
                 if chunk is None:
                     with self.lock:
-                        quiet_seconds = max(0.0, now - self.hold_last_audible_monotonic)
-                        self.state["airband_hold_quiet_seconds"] = round(quiet_seconds, 2)
-                        self.state["airband_hold_quiet_threshold_rms"] = round(self._hold_quiet_threshold_rms(), 2)
-                    if quiet_seconds >= AIRBAND_HOLD_RELEASE_SECONDS:
+                        if threshold <= 0.0:
+                            quiet_seconds = self._set_hold_squelch_state_locked(True, None, "squelch_off_no_chunk", now)
+                        else:
+                            quiet_seconds = self._set_hold_squelch_state_locked(False, None, "no_chunk", now)
+                    if threshold > 0.0 and quiet_seconds >= AIRBAND_HOLD_RELEASE_SECONDS:
                         break
                     time.sleep(max(0.0, AIRBAND_HOLD_NO_CHUNK_SLEEP_SECONDS))
                     continue
 
                 cursor, wav_content = chunk
                 rms = rms_from_wav(wav_content)
-                quiet_threshold = self._hold_quiet_threshold_rms()
-                audible = quiet_threshold <= 0.0 or rms >= quiet_threshold
+                open_state = threshold <= 0.0 or rms >= threshold
                 with self.lock:
-                    if audible:
-                        self._reset_hold_timer_locked("hold_audio", now)
-                    quiet_seconds = max(0.0, now - self.hold_last_audible_monotonic)
-                    self.state["airband_hold_rms_sample"] = round(rms, 2)
-                    self.state["airband_hold_quiet_seconds"] = round(quiet_seconds, 2)
-                    self.state["airband_hold_quiet_threshold_rms"] = round(quiet_threshold, 2)
-                    self.state["airband_last_measurement_dbfs"] = round(rms, 2)
-                if quiet_seconds >= AIRBAND_HOLD_RELEASE_SECONDS:
+                    quiet_seconds = self._set_hold_squelch_state_locked(
+                        open_state,
+                        rms,
+                        "hold_audio" if open_state else "squelch_closed",
+                        now,
+                    )
+                if not open_state and quiet_seconds >= AIRBAND_HOLD_RELEASE_SECONDS:
                     break
+
             if self.stop_event.is_set():
                 release_reason = "stopped"
             elif self.release_hold_event.is_set():
@@ -1245,6 +1261,9 @@ class AirbandScanPort:
                 self.state["airband_hold_active"] = False
                 self.state["airband_hold_channel"] = None
                 self.state["airband_hold_quiet_seconds"] = round(quiet_seconds, 2)
+                self.state["airband_hold_release_remaining_seconds"] = 0.0 if release_reason == "quiet" else AIRBAND_HOLD_RELEASE_SECONDS
+                self.state["airband_squelch_open"] = False
+                self.state["airband_squelch_state"] = "closed"
                 self.state["airband_hold_release_reason"] = release_reason
                 if not self.stop_event.is_set():
                     self.state["airband_scan_state"] = "searching"

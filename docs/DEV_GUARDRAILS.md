@@ -329,3 +329,6 @@ UAT 978 MHz work must keep persistent UAT autostart disabled until a dedicated a
 
 ## Guardrail Index — Airband hold timer and squelch
 - `docs/guardrails/PI_AIRBAND_HOLD_TIMER_GUARDRAIL.md` — Airband HOLD release is based on 7 seconds without audible held audio; playback squelch must be able to reset the hold timer independently from the activity threshold.
+
+## Guardrail Index — Airband normal scanner squelch
+- `docs/guardrails/PI_AIRBAND_NORMAL_SCANNER_SQUELCH_GUARDRAIL.md` — Airband HOLD behaves like a normal scanner: squelch open resets/holds, squelch off plays static, and only 7 seconds of closed squelch resumes scanning.
