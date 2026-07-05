@@ -100,7 +100,7 @@ NOAA_LIVE_START_SETTLE_SECONDS = tuple(
 NOAA_LIVE_START_CHUNK_TIMEOUT_SECONDS = float(os.environ.get("PI_AIR_TRAFFIC_NOAA_LIVE_CHUNK_TIMEOUT_SECONDS", "4.0"))
 RTL_POWER_RETRY_SETTLE_SECONDS = tuple(
     float(value.strip())
-    for value in os.environ.get("PI_AIR_TRAFFIC_RTL_POWER_RETRY_SETTLES", "0,1.25,2.5,4.0").split(",")
+    for value in os.environ.get("PI_AIR_TRAFFIC_RTL_POWER_RETRY_SETTLES", "0.75,2.0,4.0,7.0,10.0").split(",")
     if value.strip()
 )
 
@@ -675,6 +675,7 @@ class AudioOperations:
                         for token in (
                             "usb_claim_interface error -6",
                             "failed to open rtlsdr device",
+                            "no supported devices found",
                             "device or resource busy",
                             "resource busy",
                         )
