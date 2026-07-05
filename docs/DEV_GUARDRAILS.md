@@ -314,3 +314,6 @@ UAT 978 MHz work must keep persistent UAT autostart disabled until a dedicated a
 
 ## Guardrail Index — Pi SSH / sshpass handoff
 - `docs/guardrails/PI_SSH_SSHPASS_HANDOFF_GUARDRAIL.md` — use `sshpass`, Pi user `pi`, `/tmp` upload staging, and `scp -O` for MSYS2-to-Pi script handoffs.
+
+## Guardrail Index — UAT map icon display
+- `docs/guardrails/PI_UAT_MAP_ICON_GUARDRAIL.md` — keep the unified aircraft map while using a prop-plane marker for UAT 978 traffic and the existing jet marker for 1090 ADS-B traffic.

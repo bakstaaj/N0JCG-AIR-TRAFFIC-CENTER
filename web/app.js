@@ -391,7 +391,7 @@ function initializeAircraftMap() {
     return;
   }
   aircraftMap = L.map('aircraftMap').setView([29.7604, -95.3698], 9);
-  
+
   aircraftMap.on('click', finishReceiverLocationPick);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
@@ -523,14 +523,48 @@ function setReceiverOnMap(location) {
   receiverLocationPreview = null;
   drawReceiverRangeRings(position);
 }
+function aircraftMapSourceKey(aircraft) {
+  const source = String(aircraft && aircraft.source || '').toLowerCase();
+  const sourceLabel = String(aircraft && aircraft.source_label || '').toLowerCase();
+  const sources = Array.isArray(aircraft && aircraft.sources)
+    ? aircraft.sources.map(item => String(item || '').toLowerCase())
+    : [];
+  const hasUat = source.includes('uat_978') || sourceLabel.includes('uat') || sources.includes('uat_978');
+  if (hasUat) return 'uat_978';
+  return 'adsb_1090';
+}
+
+function aircraftMapIconPath(sourceKey) {
+  if (sourceKey === 'uat_978') {
+    return {
+      className: 'aircraft-source-uat',
+      title: '978 UAT prop-plane traffic',
+      path: 'M20 3 L22 8 L21 16 L33 20 L33 23 L22 22 L22 32 L27 36 L27 38 L20 36 L13 38 L13 36 L18 32 L18 22 L7 23 L7 20 L19 16 L18 8 Z',
+      propeller: 'M9 6 C13 3 17 3 20 6 C23 3 27 3 31 6 C27 9 23 9 20 6 C17 9 13 9 9 6 Z'
+    };
+  }
+  return {
+    className: 'aircraft-source-adsb',
+    title: '1090 ADS-B jet traffic',
+    path: 'M20 2 L23 15 L36 20 L36 23 L23 21 L22 34 L27 37 L27 39 L20 37 L13 39 L13 37 L18 34 L17 21 L4 23 L4 20 L17 15 Z',
+    propeller: ''
+  };
+}
+
 function aircraftMapIcon(aircraft) {
   const color = '#5f6670';
   const track = Number.isFinite(Number(aircraft.track)) ? Number(aircraft.track) : 0;
   const flight = aircraft.flight ? String(aircraft.flight).trim() : '';
   const label = flight || String(aircraft.hex || '').toUpperCase();
-  const html = `<div class="aircraft-icon-wrap">` +
+  const sourceKey = aircraftMapSourceKey(aircraft);
+  const iconShape = aircraftMapIconPath(sourceKey);
+  const propeller = iconShape.propeller
+    ? `<path d="${iconShape.propeller}" fill="${color}" stroke="#ffffff" stroke-width="1.25" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`
+    : '';
+  const html = `<div class="aircraft-icon-wrap ${iconShape.className}" data-aircraft-source="${sourceKey}" title="${escapeHtml(iconShape.title)}">` +
     `<svg width="28" height="28" viewBox="0 0 40 40" style="transform:rotate(${track}deg)" aria-hidden="true">` +
-    `<path d="M20 2 L23 15 L36 20 L36 23 L23 21 L22 34 L27 37 L27 39 L20 37 L13 39 L13 37 L18 34 L17 21 L4 23 L4 20 L17 15 Z"` +
+    propeller +
+    `<path d="${iconShape.path}"` +
     ` fill="${color}" stroke="#ffffff" stroke-width="1.25" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>` +
     `</svg>` +
     `<span class="aircraft-icon-label">${escapeHtml(label)}</span>` +
