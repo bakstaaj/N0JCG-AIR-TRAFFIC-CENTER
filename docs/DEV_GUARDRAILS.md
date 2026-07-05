@@ -332,3 +332,6 @@ UAT 978 MHz work must keep persistent UAT autostart disabled until a dedicated a
 
 ## Guardrail Index — Airband normal scanner squelch
 - `docs/guardrails/PI_AIRBAND_NORMAL_SCANNER_SQUELCH_GUARDRAIL.md` — Airband HOLD behaves like a normal scanner: squelch open resets/holds, squelch off plays static, and only 7 seconds of closed squelch resumes scanning.
+
+## Guardrail Index — Airband open squelch audio
+- `docs/guardrails/PI_AIRBAND_OPEN_SQUELCH_AUDIO_GUARDRAIL.md` — Airband squelch off/open must provide audible scanner audio/static, and UI squelch labels show `off`, `XXX`, or `XXX muted`.

@@ -307,6 +307,9 @@ let airbandAudioCursor = 0;
 let airbandNextPlayTime = 0;
 let airbandPumpTimer = null;
 let airbandPlayingHoldId = null;
+let airbandLastPlaybackMuted = false;
+let airbandLastPlaybackRms = null;
+let airbandLastPlaybackSquelchLabel = '';
 let airbandTestPlayedEventId = 0;
 let aircraftMap = null;
 let receiverMapMarker = null;
@@ -1802,21 +1805,26 @@ function stopAirbandPlayback() {
 async function pumpAirbandAudio(holdId) {
   if (!airbandAudioAuthorized || !airbandAudioContext || airbandPlayingHoldId !== holdId) return;
   try {
+    if (airbandAudioContext.state !== 'running') await airbandAudioContext.resume();
     const response = await fetch(`/api/airband/scan/live/audio.wav?from=${airbandAudioCursor}&request=${Date.now()}`, {cache: 'no-store'});
     if (response.status === 204) {
-      airbandPumpTimer = window.setTimeout(() => pumpAirbandAudio(holdId), 90);
+      airbandPumpTimer = window.setTimeout(() => pumpAirbandAudio(holdId), 60);
       return;
     }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const sourceSamples = Number(response.headers.get('X-Source-Samples') || 0);
-    const decoded = await airbandAudioContext.decodeAudioData((await response.arrayBuffer()).slice(0));
+    airbandLastPlaybackMuted = response.headers.get('X-Airband-Squelch-Muted') === '1';
+    const headerRms = Number(response.headers.get('X-Airband-Chunk-RMS'));
+    airbandLastPlaybackRms = Number.isFinite(headerRms) ? headerRms : airbandLastPlaybackRms;
+    const data = await response.arrayBuffer();
+    const decoded = await airbandAudioContext.decodeAudioData(data.slice(0));
     const source = airbandAudioContext.createBufferSource();
     source.buffer = decoded;
     source.connect(airbandAudioContext.destination);
     const startAt = Math.max(airbandAudioContext.currentTime + 0.04, airbandNextPlayTime);
     source.start(startAt);
     airbandNextPlayTime = startAt + decoded.duration;
-    airbandAudioCursor += sourceSamples;
+    airbandAudioCursor += Math.max(1, sourceSamples);
     const bufferedSeconds = airbandNextPlayTime - airbandAudioContext.currentTime;
     airbandPumpTimer = window.setTimeout(() => pumpAirbandAudio(holdId), bufferedSeconds > 1.4 ? 180 : 20);
   } catch (error) {
@@ -1824,6 +1832,7 @@ async function pumpAirbandAudio(holdId) {
     stopAirbandPlayback();
   }
 }
+
 function renderBlockedAirbandFrequencies(status) {
   const target = el('airbandBlockedMessage');
   if (!target) return;
@@ -1832,6 +1841,37 @@ function renderBlockedAirbandFrequencies(status) {
     ? `Blocked: ${blocked.map(value => (Number(value) / 1000000).toFixed(3) + ' MHz').join(', ')}`
     : 'No frequencies blocked.';
 }
+function airbandSquelchDisplayLabel(status) {
+  const squelch = Number(status && status.airband_playback_squelch_rms || 0);
+  if (!Number.isFinite(squelch) || squelch <= 0) return 'off';
+  const muted = Boolean(status && (
+    status.airband_playback_squelch_muted ||
+    status.airband_squelch_state === 'closed'
+  ));
+  const value = squelch.toFixed(0);
+  return muted ? `${value} muted` : value;
+}
+
+function formatAirbandHoldScannerMessage(status) {
+  const held = status.airband_hold_channel || status.airband_current_channel || {};
+  const freq = Number.isFinite(Number(held.frequency_mhz))
+    ? `${Number(held.frequency_mhz).toFixed(3)} MHz`
+    : 'held channel';
+  const state = status.airband_squelch_state || (status.airband_playback_squelch_muted ? 'closed' : 'open');
+  const quiet = Number(status.airband_hold_quiet_seconds || 0);
+  const remaining = status.airband_hold_release_remaining_seconds == null
+    ? Math.max(0, 7 - quiet)
+    : Number(status.airband_hold_release_remaining_seconds);
+  const rms = status.airband_hold_rms_sample == null
+    ? (airbandLastPlaybackRms == null ? '—' : Number(airbandLastPlaybackRms).toFixed(1))
+    : Number(status.airband_hold_rms_sample).toFixed(1);
+  const source = status.airband_open_squelch_static ? ' · open static' : '';
+  const timer = state === 'closed'
+    ? `quiet ${quiet.toFixed(1)}/7.0s · resume in ${remaining.toFixed(1)}s`
+    : 'quiet 0.0/7.0s · timer reset';
+  return `HOLD ${freq} AM · ${state.toUpperCase()} · squelch ${airbandSquelchDisplayLabel(status)} · RMS ${rms}${source} · ${timer}`;
+}
+
 function syncAirbandHoldAudio(status) {
   renderBlockedAirbandFrequencies(status);
   const holding = Boolean(status.airband_hold_active);
@@ -1841,12 +1881,20 @@ function syncAirbandHoldAudio(status) {
     if (airbandPlayingHoldId !== null) stopAirbandPlayback();
     return;
   }
-  const channel = status.airband_hold_channel || {};
-  const mhz = Number(channel.frequency_mhz || Number(channel.frequency_hz || 0) / 1000000).toFixed(3);
-  const rms = status.airband_hold_rms_sample == null ? '—' : Number(status.airband_hold_rms_sample).toFixed(1);
-  const quiet = Number(status.airband_hold_quiet_seconds || 0).toFixed(1);
-  setMessage('operationsMessage', `HOLD ${mhz} MHz AM · ${rms} RMS · live audio · quiet ${quiet}/7.0 sec`, 'good');
-  if (airbandAudioAuthorized && airbandPlayingHoldId !== status.airband_hold_id) {
+
+  const message = formatAirbandHoldScannerMessage(status);
+  setMessage(
+    'operationsMessage',
+    message,
+    status.airband_squelch_state === 'closed' || status.airband_playback_squelch_muted ? 'warning' : 'good'
+  );
+  setMessage(
+    'airbandScanStatus',
+    message,
+    status.airband_squelch_state === 'closed' || status.airband_playback_squelch_muted ? 'warning' : 'good'
+  );
+
+  if (airbandAudioAuthorized && airbandAudioContext && airbandPlayingHoldId !== status.airband_hold_id) {
     stopAirbandPlayback();
     airbandPlayingHoldId = status.airband_hold_id;
     airbandAudioCursor = 0;
@@ -1854,6 +1902,7 @@ function syncAirbandHoldAudio(status) {
     pumpAirbandAudio(airbandPlayingHoldId);
   }
 }
+
 async function skipHeldAirbandChannel() {
   try {
     const result = await jsonRequest('/api/airband/scan/activity/skip', {method: 'POST'});

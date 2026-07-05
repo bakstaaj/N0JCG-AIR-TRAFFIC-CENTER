@@ -89,6 +89,7 @@ AIRBAND_HOLD_RELEASE_SECONDS = float(os.environ.get("PI_AIR_TRAFFIC_AIRBAND_HOLD
 AIRBAND_HOLD_CHUNK_TIMEOUT_SECONDS = float(os.environ.get("PI_AIR_TRAFFIC_AIRBAND_HOLD_CHUNK_TIMEOUT_SECONDS", "1.0"))
 AIRBAND_HOLD_NO_CHUNK_SLEEP_SECONDS = float(os.environ.get("PI_AIR_TRAFFIC_AIRBAND_HOLD_NO_CHUNK_SLEEP_SECONDS", "0.15"))
 AIRBAND_NORMAL_SCANNER_SQUELCH_V1 = True
+AIRBAND_OPEN_SQUELCH_AUDIO_V1 = True
 
 # PI_SHARED_AUDIO_SDR_HARDENING_V1:
 # NOAA live audio, Airband live hold audio, and Airband fast-spectrum scans
@@ -1156,23 +1157,59 @@ class AirbandScanPort:
             open_state = threshold <= 0.0 or rms >= threshold
             self._set_hold_squelch_state_locked(open_state, rms, "squelch_adjustment")
 
+    def _open_squelch_static_wav(self, sample_rate: int = 24000, seconds: float = 0.25) -> bytes:
+        # AIRBAND_OPEN_SQUELCH_AUDIO_V1:
+        # Scanner squelch-off means the speaker is open. If rtl_fm has not
+        # produced a chunk during this short poll, return a low-level static
+        # placeholder instead of HTTP 204 so the browser keeps the speaker open.
+        sample_count = max(1, int(sample_rate * seconds))
+        seed = int(time.monotonic() * 1000) & 0x7fffffff
+        pcm = bytearray()
+        for _ in range(sample_count):
+            seed = (1103515245 * seed + 12345) & 0x7fffffff
+            value = ((seed >> 16) & 0xff) - 128
+            sample = max(-32768, min(32767, int(value * 32)))
+            pcm.extend(int(sample).to_bytes(2, "little", signed=True))
+        return make_wav(bytes(pcm), sample_rate)
+
     def live_playback_chunk(self, after_sequence: int) -> tuple[int, bytes, bool, float] | None:
-        # Step 67: live Airband playback squelch RMS gate.
-        next_chunk = self.audio_ops.audio.next_live_wav(after_sequence)
-        if next_chunk is None:
-            return None
-        sequence, content = next_chunk
-        rms = round(rms_from_wav(content), 2)
+        # Step 67 + AIRBAND_OPEN_SQUELCH_AUDIO_V1:
+        # Playback squelch controls the scanner speaker. Threshold <= 0 means
+        # squelch is off/open and the browser must receive audible open audio.
         threshold = float(self.settings.airband_playback_squelch_rms)
+        next_chunk = self.audio_ops.audio.next_live_wav(after_sequence)
+        synthetic_static = False
+        if next_chunk is None:
+            with self.lock:
+                hold_active = bool(self.state.get("airband_hold_active"))
+            if hold_active and threshold <= 0.0:
+                sequence = int(after_sequence) + 1
+                content = self._open_squelch_static_wav()
+                synthetic_static = True
+            else:
+                return None
+        else:
+            sequence, content = next_chunk
+
+        rms = round(rms_from_wav(content), 2)
         muted = bool(threshold > 0.0 and rms < threshold)
         if muted:
             pcm, rate = pcm_from_wav(content)
             content = make_wav(bytes(len(pcm)), rate)
+
         with self.lock:
             self.state["airband_playback_squelch_muted"] = muted
             self.state["airband_playback_squelch_last_rms"] = rms
+            self.state["airband_squelch_open"] = not muted
+            self.state["airband_squelch_state"] = "closed" if muted else "open"
+            self.state["airband_open_squelch_static"] = synthetic_static
             if self.state.get("airband_hold_active"):
-                self._set_hold_squelch_state_locked(not muted, rms, "playback_chunk")
+                if hasattr(self, "_set_hold_squelch_state_locked"):
+                    self._set_hold_squelch_state_locked(not muted, rms, "open_static" if synthetic_static else "playback_chunk")
+                else:
+                    self.state["airband_hold_quiet_seconds"] = 0.0 if not muted else self.state.get("airband_hold_quiet_seconds", 0.0)
+                    self.state["airband_hold_rms_sample"] = rms
+                    self.state["airband_last_measurement_dbfs"] = rms
         return sequence, content, muted, rms
 
     def release_held_channel(self, block: bool) -> dict[str, Any]:
