@@ -326,3 +326,6 @@ UAT 978 MHz work must keep persistent UAT autostart disabled until a dedicated a
 
 ## Guardrail Index — RTL tool output decoding
 - `docs/guardrails/PI_RTL_TOOL_OUTPUT_DECODE_GUARDRAIL.md` — subprocess calls that capture RTL tool text output must use UTF-8 replacement decoding so non-UTF-8 stderr/stdout cannot stop scanner workflows.
+
+## Guardrail Index — Airband hold timer and squelch
+- `docs/guardrails/PI_AIRBAND_HOLD_TIMER_GUARDRAIL.md` — Airband HOLD release is based on 7 seconds without audible held audio; playback squelch must be able to reset the hold timer independently from the activity threshold.
