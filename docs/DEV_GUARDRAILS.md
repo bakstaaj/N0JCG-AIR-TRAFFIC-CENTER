@@ -320,3 +320,6 @@ UAT 978 MHz work must keep persistent UAT autostart disabled until a dedicated a
 
 ## Guardrail Index — UI audio stop protection
 - `docs/guardrails/PI_UI_AUDIO_STOP_GUARDRAIL.md` — automatic UI refresh may poll status but must not issue NOAA/Airband stop POSTs unless tied to a recent operator action; backend logs all audio control POSTs for audit.
+
+## Guardrail Index — shared NOAA/Airband audio SDR
+- `docs/guardrails/PI_SHARED_AUDIO_SDR_GUARDRAIL.md` — NOAA live audio and Airband scanner/capture share receiver serial `00000162`; use serial-first selection, cooldown, and retry transient `usb_claim_interface` failures.

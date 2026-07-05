@@ -85,6 +85,25 @@ FAST_NOAA_LOW_HZ = 162_387_500
 FAST_NOAA_HIGH_HZ = 162_562_500
 FAST_NOAA_BIN_HZ = 12_500
 
+# PI_SHARED_AUDIO_SDR_HARDENING_V1:
+# NOAA live audio, Airband live hold audio, and Airband fast-spectrum scans
+# all share the same physical NOAA/Airband RTL-SDR. On Raspberry Pi, librtlsdr
+# can need a short settle interval after rtl_fm exits before rtl_power can
+# claim the interface. Prefer EEPROM serial selection over runtime index and
+# retry transient usb_claim failures before declaring the scanner stopped.
+AUDIO_RTL_RELEASE_SETTLE_SECONDS = float(os.environ.get("PI_AIR_TRAFFIC_AUDIO_RTL_RELEASE_SETTLE_SECONDS", "1.25"))
+NOAA_LIVE_START_SETTLE_SECONDS = tuple(
+    float(value.strip())
+    for value in os.environ.get("PI_AIR_TRAFFIC_NOAA_LIVE_START_SETTLES", "0.65,1.0,1.5,2.25,3.0").split(",")
+    if value.strip()
+)
+NOAA_LIVE_START_CHUNK_TIMEOUT_SECONDS = float(os.environ.get("PI_AIR_TRAFFIC_NOAA_LIVE_CHUNK_TIMEOUT_SECONDS", "4.0"))
+RTL_POWER_RETRY_SETTLE_SECONDS = tuple(
+    float(value.strip())
+    for value in os.environ.get("PI_AIR_TRAFFIC_RTL_POWER_RETRY_SETTLES", "0,1.25,2.5,4.0").split(",")
+    if value.strip()
+)
+
 
 
 class SingleInstanceGuard:
@@ -465,9 +484,9 @@ class AudioOperations:
             return make_wav(b"".join(pcm_parts), rate)
 
     def live_noaa_start(self, settings: PiPortSettingsStore) -> dict[str, Any]:
-        # Verified NOAA continuous live start after fast selection.
-        # A just-completed rtl_power/NFM survey can leave the RTL-SDR in a brief
-        # release interval; require actual audio output before declaring success.
+        # PI_SHARED_AUDIO_SDR_HARDENING_V1: tolerate delayed first samples after
+        # prior rtl_fm/rtl_power ownership changes. Do not report NOAA as started
+        # until at least one live WAV chunk has been received.
         with self.lock:
             if self.audio.live_is_running():
                 if self.noaa_live_active:
@@ -477,11 +496,17 @@ class AudioOperations:
             profile["frequency_hz"] = settings.noaa_frequency_hz
             profile["rtl_fm_mode"] = "fm"
             last_error = "No continuous audio block was delivered."
-            for attempt, settle_seconds in enumerate((0.45, 0.85), start=1):
-                time.sleep(settle_seconds)
+            settles = NOAA_LIVE_START_SETTLE_SECONDS or (0.65, 1.0, 1.5, 2.25, 3.0)
+            for attempt, settle_seconds in enumerate(settles, start=1):
+                if attempt > 1:
+                    self.audio.stop_live()
+                time.sleep(max(0.0, float(settle_seconds)))
                 try:
                     result = self.audio._start_live_process(profile, None)
-                    first_chunk = self.audio.next_live_wav(0, timeout_seconds=2.5)
+                    first_chunk = self.audio.next_live_wav(
+                        0,
+                        timeout_seconds=NOAA_LIVE_START_CHUNK_TIMEOUT_SECONDS,
+                    )
                     if first_chunk is not None and self.audio.live_is_running():
                         self.noaa_live_active = True
                         LOG.info(
@@ -496,29 +521,34 @@ class AudioOperations:
                             "startup_verified": True,
                             "startup_attempt": attempt,
                             "startup_settle_seconds": settle_seconds,
+                            "startup_chunk_timeout_seconds": NOAA_LIVE_START_CHUNK_TIMEOUT_SECONDS,
                         }
                     status = self.audio.live_status()
                     last_error = str(status.get("last_error") or "No live audio samples arrived.")
                     LOG.warning(
-                        "NOAA live startup attempt %s at %.3f MHz produced no audio: %s",
+                        "NOAA live startup attempt %s/%s at %.3f MHz produced no audio after %.1fs: %s",
                         attempt,
+                        len(settles),
                         settings.noaa_frequency_hz / 1_000_000,
+                        NOAA_LIVE_START_CHUNK_TIMEOUT_SECONDS,
                         last_error,
                     )
                 except Exception as exc:
                     last_error = str(exc)
                     LOG.warning(
-                        "NOAA live startup attempt %s at %.3f MHz failed: %s",
+                        "NOAA live startup attempt %s/%s at %.3f MHz failed: %s",
                         attempt,
+                        len(settles),
                         settings.noaa_frequency_hz / 1_000_000,
                         last_error,
                     )
                 finally:
                     if not self.noaa_live_active:
                         self.audio.stop_live()
+                        time.sleep(max(0.0, AUDIO_RTL_RELEASE_SETTLE_SECONDS))
             raise RuntimeError(
                 f"NOAA selected {settings.noaa_frequency_hz / 1_000_000:.3f} MHz "
-                f"but continuous audio failed after two starts: {last_error}"
+                f"but continuous audio failed after {len(settles)} starts: {last_error}"
             )
 
     def live_noaa_stop(self) -> dict[str, Any]:
@@ -570,7 +600,7 @@ class AudioOperations:
         bin_hz: int,
         gain_db: float,
     ) -> list[dict[str, Any]]:
-        """Run one rtl_power sweep using the dedicated NOAA/Airband receiver."""
+        # PI_SHARED_AUDIO_SDR_HARDENING_V1: run one rtl_power sweep using serial-first shared audio receiver selection.
         with self.lock:
             if self.noaa_live_active or self.airband_live_active or self.audio.live_is_running() or self.audio.is_running():
                 raise RuntimeError("Audio receiver is already in use.")
@@ -586,65 +616,123 @@ class AudioOperations:
             log_path = self.audio.runtime_dir / "latest_airband_fast_spectrum.log"
             csv_path.unlink(missing_ok=True)
             log_path.unlink(missing_ok=True)
-            command = [
-                windows_path(Path(rtl_power)),
-                "-d", str(index),
-                "-f", f"{int(low_hz)}:{int(high_hz)}:{int(bin_hz)}",
-                "-i", "1",
-                "-1",
-                "-g", str(float(gain_db)),
-                windows_path(csv_path),
-            ]
+
+            device_candidates: list[str] = [AUDIO_SERIAL]
+            index_text = str(index)
+            if index_text not in device_candidates:
+                device_candidates.append(index_text)
+
+            completed: subprocess.CompletedProcess[str] | None = None
+            last_command: list[str] | None = None
             started = time.monotonic()
-            completed = subprocess.run(
-                command,
-                cwd=windows_path(self.audio.runtime_dir),
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=18,
-            )
-            log_path.write_text(
-                (completed.stdout or "") + "\n" + (completed.stderr or ""),
-                encoding="utf-8",
-                newline="\n",
-            )
-            if completed.returncode != 0:
+            attempt_details: list[str] = []
+            retry_settles = RTL_POWER_RETRY_SETTLE_SECONDS or (0.0, 1.25, 2.5, 4.0)
+            for device_selector in device_candidates:
+                for attempt, settle_seconds in enumerate(retry_settles, start=1):
+                    if settle_seconds > 0:
+                        time.sleep(float(settle_seconds))
+                    csv_path.unlink(missing_ok=True)
+                    command = [
+                        windows_path(Path(rtl_power)),
+                        "-d", str(device_selector),
+                        "-f", f"{int(low_hz)}:{int(high_hz)}:{int(bin_hz)}",
+                        "-i", "1",
+                        "-1",
+                        "-g", str(float(gain_db)),
+                        windows_path(csv_path),
+                    ]
+                    last_command = command
+                    completed = subprocess.run(
+                        command,
+                        cwd=windows_path(self.audio.runtime_dir),
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                        timeout=18,
+                    )
+                    combined_output = (completed.stdout or "") + "\n" + (completed.stderr or "")
+                    attempt_details.append(
+                        f"selector={device_selector} attempt={attempt}/{len(retry_settles)} "
+                        f"settle={settle_seconds:.2f}s exit={completed.returncode}"
+                    )
+                    log_path.write_text(
+                        "\n".join([
+                            "PI_SHARED_AUDIO_SDR_HARDENING_V1 rtl_power attempts:",
+                            *attempt_details,
+                            "",
+                            "Last command:",
+                            " ".join(str(part) for part in command),
+                            "",
+                            combined_output,
+                        ]),
+                        encoding="utf-8",
+                        newline="\n",
+                    )
+                    if completed.returncode == 0 and csv_path.exists():
+                        break
+                    transient_claim = any(
+                        token in combined_output.lower()
+                        for token in (
+                            "usb_claim_interface error -6",
+                            "failed to open rtlsdr device",
+                            "device or resource busy",
+                            "resource busy",
+                        )
+                    )
+                    if not transient_claim:
+                        break
+                    LOG.warning(
+                        "rtl_power fast spectrum transient receiver claim failure selector=%s attempt=%s/%s; retrying after settle",
+                        device_selector,
+                        attempt,
+                        len(retry_settles),
+                    )
+                if completed is not None and completed.returncode == 0 and csv_path.exists():
+                    break
+
+            if completed is None or completed.returncode != 0:
                 raise RuntimeError(
-                    f"rtl_power fast spectrum sweep failed with exit code {completed.returncode}; "
-                    f"see {log_path}."
+                    f"rtl_power fast spectrum sweep failed with exit code "
+                    f"{completed.returncode if completed is not None else 'not-started'}; "
+                    f"tried selectors {device_candidates}; see {log_path}."
                 )
             if not csv_path.exists():
                 raise RuntimeError("rtl_power completed without writing fast spectrum CSV output.")
             rows: list[dict[str, Any]] = []
             with csv_path.open("r", encoding="utf-8", newline="") as handle:
-                for csv_row in csv.reader(handle):
-                    if len(csv_row) < 7:
+                for row in csv.reader(handle):
+                    if len(row) < 7:
                         continue
                     try:
-                        low = float(csv_row[2])
-                        high = float(csv_row[3])
-                        step = float(csv_row[4])
-                        powers = [float(value) for value in csv_row[6:] if value.strip()]
+                        timestamp = f"{row[0]} {row[1]}".strip()
+                        low = int(float(row[2]))
+                        high = int(float(row[3]))
+                        step = float(row[4])
+                        samples = int(float(row[5]))
+                        powers = [float(value) for value in row[6:]]
                     except ValueError:
                         continue
-                    if not powers or step <= 0:
+                    if not powers:
                         continue
+                    noise_floor = statistics.median(powers)
                     rows.append({
+                        "timestamp": timestamp,
                         "low_hz": low,
                         "high_hz": high,
                         "step_hz": step,
+                        "samples": samples,
                         "powers_db": powers,
-                        "noise_floor_db": statistics.median(powers),
+                        "noise_floor_db": noise_floor,
                     })
             if not rows:
-                raise RuntimeError("rtl_power output did not contain usable spectrum bins.")
+                raise RuntimeError(f"rtl_power completed but no usable spectrum rows were parsed from {csv_path}.")
             LOG.info(
-                "Fast Airband spectrum sweep completed over %.3f-%.3f MHz in %.2f seconds using %s rows",
+                "Fast Airband spectrum sweep completed over %.3f-%.3f MHz in %.2f seconds using %s rows; device selector %s",
                 low_hz / 1_000_000,
                 high_hz / 1_000_000,
                 time.monotonic() - started,
                 len(rows),
+                last_command[2] if last_command and len(last_command) > 2 else AUDIO_SERIAL,
             )
             return rows
 
