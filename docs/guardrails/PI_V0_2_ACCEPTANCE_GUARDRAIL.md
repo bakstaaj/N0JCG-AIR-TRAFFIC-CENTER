@@ -17,3 +17,8 @@ The V0.2 acceptance gate must preserve the menu refresh pause behavior: browser 
 
 
 - The V0.2 acceptance validator must expose RUN_V0_1_BASELINE=1 as the optional V0.1 baseline switch.
+
+## Recovery guardrails
+
+- UAT hardware capability compatibility validator must be executable at `tools/pi5_validate_uat_978_capability.sh` and may validate serial/role visibility without exclusive receiver capture when the service is already running.
+- Static scans may warn on legacy timeout text; runtime /api/uat/status decides collector pass/fail for idle 978 UAT operation.

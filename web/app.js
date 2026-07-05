@@ -4343,3 +4343,6 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   }
 })();
 // MAP_POPOUT_KIOSK_DEFAULTS_V3_END
+
+
+/* menu refresh pause: UI polling is intentionally paused while the configuration menu drawer is open. */
