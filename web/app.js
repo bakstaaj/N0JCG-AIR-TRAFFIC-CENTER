@@ -4380,3 +4380,132 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
 
 
 /* menu refresh pause: UI polling is intentionally paused while the configuration menu drawer is open. */
+
+/* RTP_UI_AUDIO_STOP_GUARD_V1: prevent refresh/polling from accidentally stopping shared audio receiver modes. */
+(() => {
+  'use strict';
+  if (window.__rtpUiAudioStopGuardV1Installed) return;
+  window.__rtpUiAudioStopGuardV1Installed = true;
+
+  const STOP_PATHS = new Set([
+    '/api/noaa/live/stop',
+    '/api/airband/scan/activity/stop'
+  ]);
+  const CONTROL_BUTTON_IDS = new Set([
+    'noaaMenuToggle',
+    'airbandMenuToggle',
+    'activityScanStop',
+    'stopLive',
+    'rescanNoaaChannel',
+    'saveAirbandRadius',
+    'saveLocation',
+    'airbandSkipHeld',
+    'airbandBlockHeld',
+    'clearAirbandBlocks'
+  ]);
+  const TRUST_WINDOW_MS = 12000;
+  const originalFetch = window.fetch.bind(window);
+
+  let lastTrustedAction = {at: 0, id: '', type: ''};
+  window.__piAudioStopGuard = {
+    installed: true,
+    blockedStops: [],
+    allowedStops: [],
+    lastTrustedAction
+  };
+
+  function requestPath(input) {
+    try {
+      const raw = typeof input === 'string' ? input : String(input && input.url || '');
+      return new URL(raw, window.location.href).pathname;
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function requestMethod(input, init) {
+    const method = init && init.method ? init.method : (input && input.method ? input.method : 'GET');
+    return String(method || 'GET').toUpperCase();
+  }
+
+  function nearestControlId(target) {
+    let node = target;
+    while (node && node !== document) {
+      try {
+        if (node.id && CONTROL_BUTTON_IDS.has(node.id)) return node.id;
+      } catch (_) {}
+      node = node.parentNode;
+    }
+    return '';
+  }
+
+  function markTrusted(event) {
+    const id = nearestControlId(event && event.target);
+    if (!id) return;
+    lastTrustedAction = {
+      at: Date.now(),
+      id,
+      type: event.type || 'user',
+      iso: new Date().toISOString()
+    };
+    window.__piAudioStopGuard.lastTrustedAction = lastTrustedAction;
+  }
+
+  function isTrustedStopAllowed() {
+    return Date.now() - Number(lastTrustedAction.at || 0) <= TRUST_WINDOW_MS;
+  }
+
+  document.addEventListener('pointerdown', markTrusted, true);
+  document.addEventListener('click', markTrusted, true);
+  document.addEventListener('keydown', event => {
+    if (event && (event.key === 'Enter' || event.key === ' ')) markTrusted(event);
+  }, true);
+
+  window.fetch = function guardedAudioControlFetch(input, init) {
+    const method = requestMethod(input, init);
+    const path = requestPath(input);
+    if (method === 'POST' && STOP_PATHS.has(path)) {
+      const allowed = isTrustedStopAllowed();
+      const audit = {
+        path,
+        method,
+        allowed,
+        trustedAction: Object.assign({}, lastTrustedAction),
+        iso: new Date().toISOString()
+      };
+      if (!allowed) {
+        window.__piAudioStopGuard.blockedStops.push(audit);
+        window.__piAudioStopGuard.blockedStops = window.__piAudioStopGuard.blockedStops.slice(-20);
+        try {
+          if (typeof setMessage === 'function') {
+            setMessage(
+              'operationsMessage',
+              `Blocked unattended ${path} request; scanner/audio stop must come from an operator action.`,
+              'warning'
+            );
+          }
+        } catch (_) {}
+        return Promise.resolve(new Response(
+          JSON.stringify({
+            error: 'blocked_untrusted_ui_stop',
+            path,
+            message: 'Audio stop was blocked because it did not follow a recent operator action.'
+          }),
+          {
+            status: 409,
+            headers: {'Content-Type': 'application/json'}
+          }
+        ));
+      }
+
+      window.__piAudioStopGuard.allowedStops.push(audit);
+      window.__piAudioStopGuard.allowedStops = window.__piAudioStopGuard.allowedStops.slice(-20);
+      const nextInit = Object.assign({}, init || {});
+      const headers = new Headers(nextInit.headers || (input && input.headers) || {});
+      headers.set('X-PI-Audio-Stop-Guard', `allowed;action=${lastTrustedAction.id || 'unknown'};age_ms=${Date.now() - Number(lastTrustedAction.at || 0)}`);
+      nextInit.headers = headers;
+      return originalFetch(input, nextInit);
+    }
+    return originalFetch(input, init);
+  };
+})();

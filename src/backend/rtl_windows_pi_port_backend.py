@@ -2194,6 +2194,26 @@ class PiPortHandler(BaseHTTPRequestHandler):
         try:
             request = urlparse(self.path)
 
+            if request.path in {
+                "/api/noaa/live/start",
+                "/api/noaa/live/stop",
+                "/api/noaa/auto/start",
+                "/api/noaa/auto/rescan",
+                "/api/airband/scan/activity/start",
+                "/api/airband/scan/activity/stop",
+                "/api/airband/scan/activity/skip",
+                "/api/airband/scan/activity/block",
+            }:
+                LOG.warning(
+                    "AUDIO_CONTROL_POST path=%s query=%s client=%s user_agent=%s referer=%s guard=%s",
+                    request.path,
+                    request.query or "",
+                    self.client_address[0] if self.client_address else "",
+                    self.headers.get("User-Agent", ""),
+                    self.headers.get("Referer", ""),
+                    self.headers.get("X-PI-Audio-Stop-Guard", ""),
+                )
+
             query = parse_qs(request.query)
             if request.path == "/api/settings/receiver":
                 location = self.settings.save_pi_location(self.read_json())

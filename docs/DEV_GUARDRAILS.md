@@ -317,3 +317,6 @@ UAT 978 MHz work must keep persistent UAT autostart disabled until a dedicated a
 
 ## Guardrail Index — UAT map icon display
 - `docs/guardrails/PI_UAT_MAP_ICON_GUARDRAIL.md` — keep the unified aircraft map while using a prop-plane marker for UAT 978 traffic and the existing jet marker for 1090 ADS-B traffic.
+
+## Guardrail Index — UI audio stop protection
+- `docs/guardrails/PI_UI_AUDIO_STOP_GUARDRAIL.md` — automatic UI refresh may poll status but must not issue NOAA/Airband stop POSTs unless tied to a recent operator action; backend logs all audio control POSTs for audit.
