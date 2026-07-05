@@ -75,6 +75,8 @@ def windows_path(path: Path) -> str:
         check=True,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=5,
     )
     return result.stdout.strip()
@@ -175,6 +177,8 @@ class DecoderManager:
             check=False,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
         )
         if completed.returncode != 0:

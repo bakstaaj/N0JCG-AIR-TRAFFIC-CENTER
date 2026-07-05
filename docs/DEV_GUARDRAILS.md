@@ -323,3 +323,6 @@ UAT 978 MHz work must keep persistent UAT autostart disabled until a dedicated a
 
 ## Guardrail Index — shared NOAA/Airband audio SDR
 - `docs/guardrails/PI_SHARED_AUDIO_SDR_GUARDRAIL.md` — NOAA live audio and Airband scanner/capture share receiver serial `00000162`; use serial-first selection, cooldown, and retry transient `usb_claim_interface` failures.
+
+## Guardrail Index — RTL tool output decoding
+- `docs/guardrails/PI_RTL_TOOL_OUTPUT_DECODE_GUARDRAIL.md` — subprocess calls that capture RTL tool text output must use UTF-8 replacement decoding so non-UTF-8 stderr/stdout cannot stop scanner workflows.
