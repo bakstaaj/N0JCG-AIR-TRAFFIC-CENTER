@@ -2316,14 +2316,27 @@ class PiPortHandler(BaseHTTPRequestHandler):
             elif request.path == "/api/aircraft.json":
                 if not self.manager.is_running():
                     try:
-                        LOG.info("ADS-B decoder not available by process state; attempting on-demand start before aircraft response.")
+                        LOG.info("ADS-B decoder not available by process state; attempting backoff-aware on-demand start before aircraft response.")
                         self.manager.start()
                     except Exception as exc:
                         LOG.warning("On-demand ADS-B decoder start failed before aircraft response: %s", exc)
-                if not self.manager.is_running():
-                    self.send_json({"error": "ADS-B decoder is not running."}, HTTPStatus.SERVICE_UNAVAILABLE)
-                else:
-                    self.send_json(self.normalize_pi_aircraft_payload(self.manager.query_aircraft()))
+                try:
+                    payload = self.normalize_pi_aircraft_payload(self.manager.query_aircraft())
+                    if not self.manager.is_running():
+                        payload["_decoder_running"] = False
+                        payload["_decoder_recovering"] = True
+                    self.send_json(payload)
+                except Exception as exc:
+                    cached_getter = getattr(self.manager, "cached_aircraft_payload", None)
+                    cached = cached_getter() if callable(cached_getter) else None
+                    if cached is not None:
+                        payload = self.normalize_pi_aircraft_payload(cached)
+                        payload["_decoder_running"] = False
+                        payload["_decoder_recovering"] = True
+                        payload["_decoder_query_error"] = str(exc)
+                        self.send_json(payload)
+                    else:
+                        self.send_json({"error": "ADS-B decoder is not running.", "details": str(exc)}, HTTPStatus.SERVICE_UNAVAILABLE)
             elif request.path == "/api/settings/receiver":
                 self.send_json({"configured": True, "receiver_location": self.settings.pi_location(), "default_airband_radius_miles": DEFAULT_RADIUS_MILES})
             elif request.path in ("/api/aircraft/hex", "/api/aircraft/local"):

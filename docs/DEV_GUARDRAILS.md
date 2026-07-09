@@ -335,3 +335,6 @@ UAT 978 MHz work must keep persistent UAT autostart disabled until a dedicated a
 
 ## Guardrail Index — Airband open squelch audio
 - `docs/guardrails/PI_AIRBAND_OPEN_SQUELCH_AUDIO_GUARDRAIL.md` — Airband squelch off/open must provide audible scanner audio/static, and UI squelch labels show `off`, `XXX`, or `XXX muted`.
+
+## Guardrail Index — ADS-B feed restart stability
+- `docs/guardrails/PI_ADSB_FEED_RESTART_GUARDRAIL.md` — `/api/aircraft.json` polling must not clear the aircraft list or restart readsb every few seconds; preserve last valid feed during decoder recovery.

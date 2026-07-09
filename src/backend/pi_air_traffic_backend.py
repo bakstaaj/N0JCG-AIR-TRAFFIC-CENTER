@@ -44,6 +44,9 @@ UAT_RAW_PORT = int(os.environ.get("PI_AIR_TRAFFIC_UAT_RAW_PORT", "30979"))
 TRAFFIC_SOURCE_SETTINGS_FILENAME = "traffic_sources.json"
 DEFAULT_TRAFFIC_SOURCES = {"adsb_1090_enabled": True, "uat_978_enabled": False}
 UAT_AIRCRAFT_STALE_SECONDS = float(os.environ.get("PI_AIR_TRAFFIC_UAT_STALE_SECONDS", "90"))
+PI_ADSB_RESTART_STABILITY_V1 = True
+ADSB_RESTART_BACKOFF_SECONDS = float(os.environ.get("PI_AIR_TRAFFIC_ADSB_RESTART_BACKOFF_SECONDS", "20"))
+ADSB_STALE_CACHE_SECONDS = float(os.environ.get("PI_AIR_TRAFFIC_ADSB_STALE_CACHE_SECONDS", "180"))
 
 LOG = logging.getLogger("pi_air_traffic_backend")
 RTL_TEST_DEVICE_RE = re.compile(r"^\s*(\d+):\s*([^,]+),\s*([^,]+),\s*SN:\s*(\S+)\s*$")
@@ -112,6 +115,11 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
         self.log_path = runtime_root / "logs" / "readsb_adsb_1090.log"
         self.readsb_command_path: str | None = None
         self.roles: dict[str, Any] = {}
+        self.last_start_attempt_at = 0.0
+        self.last_process_exit_at: float | None = None
+        self.last_readsb_returncode: int | None = None
+        self.aircraft_cache_payload: dict[str, Any] | None = None
+        self.aircraft_cache_updated_at = 0.0
 
     @property
     def decoder_json_url(self) -> str:
@@ -124,6 +132,8 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
             check=False,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
         )
 
@@ -246,25 +256,68 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
             command.extend(shlex.split(extra))
         return command
 
+    def _close_log_handle_if_stopped(self) -> None:
+        if self.log_handle is not None:
+            try:
+                self.log_handle.close()
+            except Exception:
+                pass
+            self.log_handle = None
+
     def is_running(self) -> bool:
-        # Only the child process owned by this backend proves decoder liveness.
-        # A readable aircraft.json can be stale after a service restart; treating
-        # it as running prevents readsb from being launched and freezes ADS-B data.
-        return self.process is not None and self.process.poll() is None
+        # Only the child process owned by this backend proves live decoder liveness.
+        # Keep stale JSON as a display cache, not as proof that readsb is alive.
+        if self.process is None:
+            return False
+        returncode = self.process.poll()
+        if returncode is None:
+            return True
+        self.last_readsb_returncode = int(returncode)
+        self.last_process_exit_at = time.time()
+        self.process = None
+        self._close_log_handle_if_stopped()
+        return False
+
+    def _cache_aircraft_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        cached = dict(payload)
+        aircraft = cached.get("aircraft")
+        if aircraft is None:
+            cached["aircraft"] = []
+        elif not isinstance(aircraft, list):
+            raise ValueError("readsb aircraft JSON field 'aircraft' must be a list.")
+        self.aircraft_cache_payload = cached
+        self.aircraft_cache_updated_at = time.time()
+        return cached
+
+    def cached_aircraft_payload(self) -> dict[str, Any] | None:
+        if self.aircraft_cache_payload is None:
+            return None
+        age = time.time() - self.aircraft_cache_updated_at
+        if age > ADSB_STALE_CACHE_SECONDS:
+            return None
+        payload = dict(self.aircraft_cache_payload)
+        payload["aircraft"] = [dict(item) for item in payload.get("aircraft", []) if isinstance(item, dict)]
+        payload["_stale_decoder_cache"] = True
+        payload["_stale_decoder_cache_age_seconds"] = round(age, 2)
+        payload["_stale_decoder_cache_ttl_seconds"] = ADSB_STALE_CACHE_SECONDS
+        if self.last_readsb_returncode is not None:
+            payload["_last_readsb_returncode"] = self.last_readsb_returncode
+        return payload
 
     def query_aircraft(self, timeout: float = 1.5) -> dict[str, Any]:
         del timeout
         if not self.aircraft_json_path.is_file():
+            cached = self.cached_aircraft_payload()
+            if cached is not None:
+                return cached
             raise FileNotFoundError(f"readsb aircraft JSON is not available yet: {self.aircraft_json_path}")
         payload = json.loads(self.aircraft_json_path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
+            cached = self.cached_aircraft_payload()
+            if cached is not None:
+                return cached
             raise ValueError(f"readsb aircraft JSON must be an object: {self.aircraft_json_path}")
-        aircraft = payload.get("aircraft")
-        if aircraft is None:
-            payload["aircraft"] = []
-        elif not isinstance(aircraft, list):
-            raise ValueError("readsb aircraft JSON field 'aircraft' must be a list.")
-        return payload
+        return self._cache_aircraft_payload(payload)
 
     def start(self) -> dict[str, Any]:
         with self.lock:
@@ -276,6 +329,20 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
                 return status
             if self.is_running():
                 return self.status()
+            now = time.time()
+            backoff_remaining = ADSB_RESTART_BACKOFF_SECONDS - (now - self.last_start_attempt_at)
+            if self.last_start_attempt_at > 0 and backoff_remaining > 0:
+                status = self.status()
+                decoder = status.setdefault("decoder", {})
+                decoder["restart_backoff_active"] = True
+                decoder["restart_backoff_remaining_seconds"] = round(backoff_remaining, 2)
+                decoder["last_readsb_returncode"] = self.last_readsb_returncode
+                LOG.warning(
+                    "ADS-B readsb restart suppressed for %.1fs to avoid clearing aircraft feed during rapid polling.",
+                    backoff_remaining,
+                )
+                return status
+            self.last_start_attempt_at = now
             self.last_error = None
             try:
                 mapping = self.resolve_roles()
@@ -283,10 +350,9 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
                 self.runtime_dir.mkdir(parents=True, exist_ok=True)
                 self.log_path.parent.mkdir(parents=True, exist_ok=True)
                 self.json_dir.mkdir(parents=True, exist_ok=True)
-                try:
-                    self.aircraft_json_path.unlink()
-                except FileNotFoundError:
-                    pass
+                # Do not delete aircraft.json on restart. The UI uses the last
+                # valid payload as a short-lived display cache while readsb
+                # restarts, so polling does not clear active aircraft every few seconds.
                 command = self._readsb_command(adsb_index)
                 self.log_handle = self.log_path.open("a", encoding="utf-8", newline="\n")
                 LOG.info(
@@ -346,11 +412,22 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
                 decoder["messages"] = int(aircraft_json.get("messages", 0))
                 decoder["aircraft_count"] = len(aircraft_json.get("aircraft", []))
                 decoder["json_ready"] = True
+                decoder["stale_cache"] = bool(aircraft_json.get("_stale_decoder_cache"))
             except Exception as exc:
                 decoder["json_ready"] = False
                 decoder["query_error"] = str(exc)
         else:
-            decoder["json_ready"] = False
+            cached = self.cached_aircraft_payload()
+            decoder["json_ready"] = bool(cached)
+            decoder["stale_cache"] = bool(cached)
+            if cached is not None:
+                decoder["messages"] = int(cached.get("messages", 0))
+                decoder["aircraft_count"] = len(cached.get("aircraft", []))
+                decoder["stale_cache_age_seconds"] = cached.get("_stale_decoder_cache_age_seconds")
+            if self.last_readsb_returncode is not None:
+                decoder["last_readsb_returncode"] = self.last_readsb_returncode
+            if self.last_process_exit_at is not None:
+                decoder["last_process_exit_age_seconds"] = round(time.time() - self.last_process_exit_at, 2)
         return {
             "ok": True,
             "service": "PI-AIR-TRAFFIC-TRACKER",
