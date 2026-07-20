@@ -1526,7 +1526,35 @@ async function updateAircraft() {
     const data = await jsonRequest('/api/aircraft.json');
     const body = el('aircraftRows');
     const aircraft = Array.isArray(data.aircraft) ? data.aircraft : [];
-    const activeAircraft = aircraft.filter(isAircraftRecordActive);
+    const activeAircraft = aircraft
+      .filter(isAircraftRecordActive)
+      .sort((left, right) => {
+        // PI_AIRCRAFT_ALPHABETICAL_SORT_V1:
+        // Sort by displayed callsign. Aircraft without a callsign follow
+        // callsign entries and are sorted by ICAO hex.
+        const leftFlight = String(left && left.flight || '').trim().toUpperCase();
+        const rightFlight = String(right && right.flight || '').trim().toUpperCase();
+
+        if (leftFlight && rightFlight) {
+          const byFlight = leftFlight.localeCompare(rightFlight, undefined, {
+            numeric: true,
+            sensitivity: 'base'
+          });
+          if (byFlight) return byFlight;
+        } else if (leftFlight) {
+          return -1;
+        } else if (rightFlight) {
+          return 1;
+        }
+
+        const leftHex = String(left && left.hex || '').trim().toUpperCase();
+        const rightHex = String(right && right.hex || '').trim().toUpperCase();
+
+        return leftHex.localeCompare(rightHex, undefined, {
+          numeric: true,
+          sensitivity: 'base'
+        });
+      });
     if (data && data.source_counts) {
       setText('messageCount', formattedNumber(Number(data.messages || 0)));
       setText('aircraftCount', formattedNumber(activeAircraft.length));
