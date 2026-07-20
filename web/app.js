@@ -319,6 +319,7 @@ let aircraftMapMarkers = new Map();
 let aircraftLastPositions = new Map();
 let aircraftTrailSegments = new Map();
 let aircraftMapFirstFit = true;
+let receiverInitialMapViewApplied = false;
 let receiverLocationPickActive = false;
 let receiverLocationPreview = null;
 const TRAIL_STORAGE_KEY = 'rtlPiAdsbTrailHistoryV1';
@@ -331,7 +332,7 @@ let aircraftTrailDisplayMode = localStorage.getItem(TRAIL_DISPLAY_MODE_KEY) || '
 if (aircraftTrailDisplayMode !== 'active' && aircraftTrailDisplayMode !== 'history') aircraftTrailDisplayMode = 'active';
 let aircraftTrailClearedAt = Number(localStorage.getItem(TRAIL_CLEARED_AT_KEY) || '0');
 const ACTIVE_AIRCRAFT_STALE_SECONDS = 60;
-const INITIAL_MAP_RADIUS_MILES = 30; // PI_INITIAL_MAP_RADIUS_30_MILES_V1
+const INITIAL_MAP_RADIUS_MILES = 30; // PI_INITIAL_MAP_RELOAD_30_MILES_V1
 const METERS_PER_MILE = 1609.344;
 
 function el(id) { return document.getElementById(id); }
@@ -529,10 +530,11 @@ function setReceiverOnMap(location) {
     receiverMapMarker.setLatLng(position);
   }
   receiverMapMarker.setPopupContent(`<strong>Receiver</strong><br>${escapeHtml(location.name || '')}<br>${position[0].toFixed(5)}, ${position[1].toFixed(5)}`);
-  if (aircraftMapFirstFit) {
+  if (!receiverInitialMapViewApplied) {
     fitMapToReceiverRadius(position, INITIAL_MAP_RADIUS_MILES);
-    // Preserve the receiver-centered 40-mile startup view. The operator can
-    // still use Fit Aircraft to expand the map to all current traffic.
+    // Apply the receiver-centered 30-mile startup view exactly once per page
+    // load, regardless of whether aircraft or status data returned first.
+    receiverInitialMapViewApplied = true;
     aircraftMapFirstFit = false;
   }
   if (receiverMapMarker && receiverMapMarker.setStyle) {
@@ -924,7 +926,7 @@ function updateAircraftMap(aircraftRecords) {
     positioned.length ? `Displaying ${positioned.length} aircraft with positions. Click an aircraft for details.` : 'No positioned aircraft currently reported by readsb.',
     positioned.length ? 'good' : '');
 
-  if (aircraftMapFirstFit && positioned.length) {
+  if (aircraftMapFirstFit && receiverMapLocation && positioned.length) {
     const points = positioned.map(item => [Number(item.lat), Number(item.lon)]);
     if (receiverMapLocation) points.push(receiverMapLocation);
     aircraftMap.fitBounds(points, {padding: [30, 30], maxZoom: 11});
@@ -4155,7 +4157,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   window.__rtlAdsbMapPopoutKioskDefaultsV3Installed = true;
 
   const POPOUT_PARAM = 'map_popout';
-  const DEFAULT_RECEIVER_RADIUS_MILES = 60;
+  const DEFAULT_RECEIVER_RADIUS_MILES = 30;
   const PLANE_AUTOFIT_MIN_INTERVAL_MS = 6000;
   const RADIO_RADIUS_APPLY_MIN_INTERVAL_MS = 15000;
 
@@ -4198,7 +4200,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
       if (['receiver', 'home', 'center', '0', 'false', 'no', 'off'].includes(value)) return 'receiver';
     }
 
-    // Kiosk default for pop-out: receiver-centered 60-mile view.
+    // Kiosk default for pop-out: receiver-centered 30-mile view.
     return 'receiver';
   }
 
@@ -4218,9 +4220,12 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   }
 
   function configuredRadioRadiusMiles() {
-    // By default the radio/Airband radius follows the map radius. Use radio_radius_miles
-    // only when the kiosk needs radio coverage to differ from the map framing radius.
-    return numericRadiusFromParams(['radio_radius_miles', 'airband_radius_miles', 'scan_radius_miles'], configuredRadiusMiles());
+    // Preserve the saved Airband radius unless the kiosk URL explicitly
+    // supplies a separate radio/scanner radius.
+    return numericRadiusFromParams(
+      ['radio_radius_miles', 'airband_radius_miles', 'scan_radius_miles'],
+      null
+    );
   }
 
   function formatRadiusForInput(radius) {
@@ -4369,6 +4374,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
     if (!isMapPopoutWindow()) return false;
 
     const radius = configuredRadioRadiusMiles();
+    if (radius == null) return true;
     const desired = formatRadiusForInput(radius);
     let changed = false;
 
@@ -4414,7 +4420,9 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
       document.body.classList.add('map-popout-kiosk-defaults-v3');
       document.body.dataset.mapPopoutFit = configuredFitMode();
       document.body.dataset.mapPopoutRadiusMiles = String(configuredRadiusMiles());
-      document.body.dataset.mapPopoutRadioRadiusMiles = String(configuredRadioRadiusMiles());
+      const radioRadius = configuredRadioRadiusMiles();
+      if (radioRadius == null) delete document.body.dataset.mapPopoutRadioRadiusMiles;
+      else document.body.dataset.mapPopoutRadioRadiusMiles = String(radioRadius);
     } catch (_) {}
 
     syncRadioRadiusControl(force);
@@ -4472,7 +4480,8 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
     const timer = window.setInterval(() => {
       attempts += 1;
       installKioskDefaults();
-      if ((mapReady() && currentReceiverLocation() && lastRadioRadiusSignature) || attempts >= 160) {
+      const radioRadiusReady = configuredRadioRadiusMiles() == null || Boolean(lastRadioRadiusSignature);
+      if ((mapReady() && currentReceiverLocation() && radioRadiusReady) || attempts >= 160) {
         if (attempts >= 160 || receiverRadiusFitApplied || configuredFitMode() === 'planes') {
           window.clearInterval(timer);
         }
