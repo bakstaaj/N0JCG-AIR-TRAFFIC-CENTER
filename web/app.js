@@ -331,6 +331,8 @@ let aircraftTrailDisplayMode = localStorage.getItem(TRAIL_DISPLAY_MODE_KEY) || '
 if (aircraftTrailDisplayMode !== 'active' && aircraftTrailDisplayMode !== 'history') aircraftTrailDisplayMode = 'active';
 let aircraftTrailClearedAt = Number(localStorage.getItem(TRAIL_CLEARED_AT_KEY) || '0');
 const ACTIVE_AIRCRAFT_STALE_SECONDS = 60;
+const INITIAL_MAP_RADIUS_MILES = 40; // PI_INITIAL_MAP_RADIUS_40_MILES_V1
+const METERS_PER_MILE = 1609.344;
 
 function el(id) { return document.getElementById(id); }
 function setText(id, value) { const node = el(id); if (node) node.textContent = value; }
@@ -401,6 +403,14 @@ L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(aircraftMap);
 }
+function fitMapToReceiverRadius(position, radiusMiles) {
+  if (!aircraftMap || !Array.isArray(position) || position.length < 2) return;
+  const radiusMeters = Number(radiusMiles) * METERS_PER_MILE;
+  if (!Number.isFinite(radiusMeters) || radiusMeters <= 0) return;
+  const bounds = L.circle(position, {radius: radiusMeters}).getBounds();
+  aircraftMap.fitBounds(bounds, {padding: [18, 18]});
+}
+
 function setReceiverPreviewOnMap(latitude, longitude) {
   if (!aircraftMap) return;
   const position = [Number(latitude), Number(longitude)];
@@ -519,7 +529,12 @@ function setReceiverOnMap(location) {
     receiverMapMarker.setLatLng(position);
   }
   receiverMapMarker.setPopupContent(`<strong>Receiver</strong><br>${escapeHtml(location.name || '')}<br>${position[0].toFixed(5)}, ${position[1].toFixed(5)}`);
-  if (aircraftMapFirstFit) aircraftMap.setView(position, 10);
+  if (aircraftMapFirstFit) {
+    fitMapToReceiverRadius(position, INITIAL_MAP_RADIUS_MILES);
+    // Preserve the receiver-centered 40-mile startup view. The operator can
+    // still use Fit Aircraft to expand the map to all current traffic.
+    aircraftMapFirstFit = false;
+  }
   if (receiverMapMarker && receiverMapMarker.setStyle) {
     receiverMapMarker.setStyle({color: '#ffffff', weight: 2});
   }
