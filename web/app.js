@@ -332,7 +332,7 @@ let aircraftTrailDisplayMode = localStorage.getItem(TRAIL_DISPLAY_MODE_KEY) || '
 if (aircraftTrailDisplayMode !== 'active' && aircraftTrailDisplayMode !== 'history') aircraftTrailDisplayMode = 'active';
 let aircraftTrailClearedAt = Number(localStorage.getItem(TRAIL_CLEARED_AT_KEY) || '0');
 const ACTIVE_AIRCRAFT_STALE_SECONDS = 60;
-const INITIAL_MAP_RADIUS_MILES = 30; // PI_INITIAL_MAP_RELOAD_30_MILES_V1
+const INITIAL_MAP_RADIUS_MILES = 30; // PI_INITIAL_MAP_RELOAD_30_MILES_V1 // PI_INITIAL_MAP_RELOAD_30_MILES_V1
 const METERS_PER_MILE = 1609.344;
 
 function el(id) { return document.getElementById(id); }
