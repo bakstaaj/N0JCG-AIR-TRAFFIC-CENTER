@@ -3466,216 +3466,51 @@ function rtpV34InstallAircraftMapDblclickCapture(){
 }
 try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAircraftMapDblclickCapture,250));}catch(_e){}
 
-/* BEGIN Phase 1 weather radar overlay */
-(() => {
-  if (window.__rtlAdsbWeatherRadarPhase1Installed) return;
-  window.__rtlAdsbWeatherRadarPhase1Installed = true;
-
-  const ENABLED_KEY = 'rtlAdsbWeatherRadarEnabledV1';
-  const OPACITY_KEY = 'rtlAdsbWeatherRadarOpacityV1';
-  const REFRESH_MS = 5 * 60 * 1000;
-  const MIN_OPACITY = 15;
-  const MAX_OPACITY = 85;
-
-  let radarLayer = null;
-  let refreshTimer = null;
-  let installedControls = false;
-  let opacity = Number(localStorage.getItem(OPACITY_KEY) || '45');
-  if (!Number.isFinite(opacity) || opacity < MIN_OPACITY || opacity > MAX_OPACITY) opacity = 45;
-
-  function node(id) {
-    return document.getElementById(id);
-  }
-
-  function announce(message, kind) {
-    try {
-      if (typeof setMessage === 'function') {
-        setMessage('mapMessage', message, kind || '');
-        return;
-      }
-    } catch (_) {}
-    const target = node('mapMessage');
-    if (target) target.textContent = message;
-  }
-
-  function mapReady() {
-    try {
-      return typeof L !== 'undefined' && typeof aircraftMap !== 'undefined' && aircraftMap;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function tileUrl() {
-    const bucket = Math.floor(Date.now() / REFRESH_MS);
-    return `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q/{z}/{x}/{y}.png?rtp=${bucket}`;
-  }
-
-  function ensurePane() {
-    if (!mapReady() || !aircraftMap.createPane) return;
-    if (!aircraftMap.getPane('weatherRadarPane')) {
-      const pane = aircraftMap.createPane('weatherRadarPane');
-      pane.style.zIndex = '350';
-      pane.style.pointerEvents = 'none';
-    }
-  }
-
-  function createLayer() {
-    ensurePane();
-    return L.tileLayer(tileUrl(), {
-      pane: 'weatherRadarPane',
-      opacity: opacity / 100,
-      maxZoom: 19,
-      crossOrigin: true,
-      attribution: 'Radar: Iowa State IEM / NEXRAD'
-    });
-  }
-
-  function refreshLayer() {
-    if (!radarLayer) return;
-    radarLayer.setUrl(tileUrl());
-    try { radarLayer.redraw(); } catch (_) {}
-  }
-
-  function stopTimer() {
-    if (refreshTimer) {
-      window.clearInterval(refreshTimer);
-      refreshTimer = null;
-    }
-  }
-
-  function startTimer() {
-    stopTimer();
-    refreshTimer = window.setInterval(refreshLayer, REFRESH_MS);
-  }
-
-  function controlsEnabled() {
-    return localStorage.getItem(ENABLED_KEY) === '1';
-  }
-
-  function updateControls() {
-    const toggle = node('weatherRadarToggle');
-    const slider = node('weatherRadarOpacity');
-    const value = node('weatherRadarOpacityValue');
-    if (toggle) toggle.checked = controlsEnabled();
-    if (slider) slider.value = String(opacity);
-    if (value) value.textContent = `${opacity}%`;
-  }
-
-  function setEnabled(enabled, announceChange = true) {
-    if (!mapReady()) return;
-    const active = Boolean(enabled);
-    localStorage.setItem(ENABLED_KEY, active ? '1' : '0');
-
-    if (active) {
-      if (!radarLayer) radarLayer = createLayer();
-      if (!aircraftMap.hasLayer(radarLayer)) radarLayer.addTo(aircraftMap);
-      radarLayer.setOpacity(opacity / 100);
-      refreshLayer();
-      startTimer();
-      if (announceChange) announce('Weather radar overlay enabled. Aircraft markers and trails remain above radar.', 'good');
-    } else {
-      stopTimer();
-      if (radarLayer && aircraftMap.hasLayer(radarLayer)) aircraftMap.removeLayer(radarLayer);
-      if (announceChange) announce('Weather radar overlay disabled.', '');
-    }
-
-    updateControls();
-  }
-
-  function setOpacity(value) {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return;
-    opacity = Math.max(MIN_OPACITY, Math.min(MAX_OPACITY, Math.round(parsed)));
-    localStorage.setItem(OPACITY_KEY, String(opacity));
-    if (radarLayer) radarLayer.setOpacity(opacity / 100);
-    updateControls();
-  }
-
-  function installControls() {
-    if (installedControls || !mapReady()) return true;
-    const toolbar = document.querySelector('.map-toolbar');
-    if (!toolbar) return false;
-    if (node('weatherRadarControls')) {
-      installedControls = true;
-      return true;
-    }
-
-    const controls = document.createElement('div');
-    controls.id = 'weatherRadarControls';
-    controls.className = 'map-weather-controls';
-    controls.innerHTML = [
-      '<label class="map-weather-toggle" title="Overlay current NEXRAD base reflectivity radar">',
-      '<input id="weatherRadarToggle" type="checkbox"> Radar',
-      '</label>',
-      '<label class="map-weather-opacity" title="Weather radar overlay opacity">',
-      '<span>Opacity</span>',
-      `<input id="weatherRadarOpacity" type="range" min="${MIN_OPACITY}" max="${MAX_OPACITY}" step="5" value="${opacity}">`,
-      `<span id="weatherRadarOpacityValue">${opacity}%</span>`,
-      '</label>',
-      '<button id="weatherRadarRefresh" type="button" title="Refresh radar tiles now">Refresh Radar</button>'
-    ].join('');
-
-    const message = node('mapMessage');
-    if (message && message.parentElement === toolbar) toolbar.insertBefore(controls, message);
-    else toolbar.appendChild(controls);
-
-    const toggle = node('weatherRadarToggle');
-    const slider = node('weatherRadarOpacity');
-    const refresh = node('weatherRadarRefresh');
-
-    if (toggle) toggle.addEventListener('change', () => setEnabled(toggle.checked));
-    if (slider) slider.addEventListener('input', () => setOpacity(slider.value));
-    if (refresh) refresh.addEventListener('click', () => {
-      refreshLayer();
-      announce('Weather radar overlay refreshed.', 'good');
-    });
-
-    installedControls = true;
-    updateControls();
-    if (controlsEnabled()) setEnabled(true, false);
-    return true;
-  }
-
-  function bootstrap() {
-    if (installControls()) return;
-    let attempts = 0;
-    const timer = window.setInterval(() => {
-      attempts += 1;
-      if (installControls() || attempts > 80) window.clearInterval(timer);
-    }, 250);
-  }
-
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootstrap);
-  else bootstrap();
-})();
-/* END Phase 1 weather radar overlay */
-
-/* RTP_WEATHER_RADAR_PHASE1_V2: current NEXRAD radar overlay for the aircraft map. */
+/* RTP_WEATHER_RADAR_HISTORY_MENU_V1_START */
 (() => {
   'use strict';
-  if (window.__rtpWeatherRadarPhase1V2Installed) return;
-  window.__rtpWeatherRadarPhase1V2Installed = true;
+  if (window.__rtpWeatherRadarHistoryMenuV1Installed) return;
+  window.__rtpWeatherRadarHistoryMenuV1Installed = true;
 
   const ENABLED_KEY = 'rtlAdsbWeatherRadarEnabledV1';
   const OPACITY_KEY = 'rtlAdsbWeatherRadarOpacityV1';
+  const HISTORY_KEY = 'rtlAdsbWeatherRadarHistoryMinutesV1';
+  const SPEED_KEY = 'rtlAdsbWeatherRadarPlaybackSpeedV1';
+  const LOOP_KEY = 'rtlAdsbWeatherRadarLoopV1';
+
+  const WEATHER_MAPS_URL = 'https://api.rainviewer.com/public/weather-maps.json';
   const REFRESH_MS = 5 * 60 * 1000;
   const MIN_OPACITY = 15;
   const MAX_OPACITY = 85;
   const DEFAULT_OPACITY = 45;
-  let radarLayer = null;
-  let refreshTimer = null;
-  let installedControls = false;
+  const DEFAULT_HISTORY_MINUTES = 60;
+  const DEFAULT_SPEED_MS = 900;
+  const NEWEST_FRAME_HOLD_MS = 1800;
+  const MAX_NATIVE_ZOOM = 7;
 
-  function getElement(id) {
+  let radarHost = '';
+  let radarFrames = [];
+  let radarLayer = null;
+  let currentFrameIndex = -1;
+  let refreshTimer = null;
+  let playbackTimer = null;
+  let playbackRunning = false;
+  let loadingFrames = false;
+  let controlsBound = false;
+
+  function byId(id) {
     try { return document.getElementById(id); } catch (_) { return null; }
   }
 
-  function getMap() {
+  function mapInstance() {
     try {
       if (typeof aircraftMap !== 'undefined' && aircraftMap) return aircraftMap;
     } catch (_) {}
     return null;
+  }
+
+  function radarEnabled() {
+    return localStorage.getItem(ENABLED_KEY) === '1';
   }
 
   function currentOpacity() {
@@ -3684,20 +3519,31 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
     return Math.max(MIN_OPACITY, Math.min(MAX_OPACITY, Math.round(stored)));
   }
 
-  function setStatus(message, kind) {
-    try {
-      if (typeof setMessage === 'function') {
-        setMessage('mapMessage', message, kind || '');
-        return;
-      }
-    } catch (_) {}
-    const node = getElement('mapMessage');
-    if (node) node.textContent = message;
+  function historyMinutes() {
+    const stored = Number(localStorage.getItem(HISTORY_KEY) || DEFAULT_HISTORY_MINUTES);
+    return stored === 120 ? 120 : 60;
   }
 
-  function radarUrl() {
-    const bucket = Math.floor(Date.now() / REFRESH_MS);
-    return `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q/{z}/{x}/{y}.png?rtp=${bucket}`;
+  function playbackSpeedMs() {
+    const stored = Number(localStorage.getItem(SPEED_KEY) || DEFAULT_SPEED_MS);
+    return [550, 900, 1400].includes(stored) ? stored : DEFAULT_SPEED_MS;
+  }
+
+  function playbackLoops() {
+    const stored = localStorage.getItem(LOOP_KEY);
+    return stored == null ? true : stored === '1';
+  }
+
+  function setRadarStatus(message, kind) {
+    const status = byId('weatherRadarStatus');
+    if (status) {
+      status.textContent = message;
+      status.className = `message compact-message ${kind || ''}`.trim();
+      return;
+    }
+    try {
+      if (typeof setMessage === 'function') setMessage('mapMessage', message, kind || '');
+    } catch (_) {}
   }
 
   function ensureRadarPane(map) {
@@ -3706,38 +3552,231 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
     try { pane = map.getPane('weatherRadarPane'); } catch (_) {}
     if (!pane) {
       pane = map.createPane('weatherRadarPane');
-      // Above base map tiles, below route/trail overlays and aircraft markers.
       pane.style.zIndex = '300';
       pane.style.pointerEvents = 'none';
     }
     return 'weatherRadarPane';
   }
 
-  function createRadarLayer(map) {
-    if (typeof L === 'undefined' || !L.tileLayer) return null;
-    return L.tileLayer(radarUrl(), {
-      pane: ensureRadarPane(map),
-      opacity: currentOpacity() / 100,
-      maxZoom: 19,
-      crossOrigin: true,
-      attribution: 'Radar: Iowa State IEM / NEXRAD'
+  function frameTileUrl(frame) {
+    if (!frame || !radarHost || !frame.path) return '';
+    return `${radarHost}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+  }
+
+  function ensureRadarLayer() {
+    const map = mapInstance();
+    const frame = radarFrames[currentFrameIndex] || radarFrames[radarFrames.length - 1];
+    if (!map || typeof L === 'undefined' || !L.tileLayer || !frame) return null;
+
+    if (!radarLayer) {
+      radarLayer = L.tileLayer(frameTileUrl(frame), {
+        pane: ensureRadarPane(map),
+        opacity: currentOpacity() / 100,
+        maxNativeZoom: MAX_NATIVE_ZOOM,
+        maxZoom: 19,
+        updateWhenIdle: false,
+        keepBuffer: 2,
+        crossOrigin: true,
+        attribution: 'Radar: RainViewer'
+      });
+    }
+
+    try {
+      if (!map.hasLayer(radarLayer)) radarLayer.addTo(map);
+    } catch (_) {
+      try { radarLayer.addTo(map); } catch (_error) { return null; }
+    }
+    return radarLayer;
+  }
+
+  function relativeFrameText(index) {
+    const frame = radarFrames[index];
+    if (!frame) return 'No frame';
+    const newest = radarFrames[radarFrames.length - 1];
+    const minutesAgo = newest
+      ? Math.max(0, Math.round((Number(newest.time) - Number(frame.time)) / 60))
+      : 0;
+    const timeText = new Date(Number(frame.time) * 1000).toLocaleTimeString([], {
+      hour: 'numeric',
+      minute: '2-digit'
     });
+    return minutesAgo === 0 ? `${timeText} · Latest` : `${timeText} · ${minutesAgo} min ago`;
   }
 
-  function updateControls(enabled) {
-    const opacity = currentOpacity();
-    const toggle = getElement('weatherRadarToggle');
-    const slider = getElement('weatherRadarOpacity');
-    const value = getElement('weatherRadarOpacityValue');
-    if (toggle) toggle.checked = Boolean(enabled);
-    if (slider) slider.value = String(opacity);
-    if (value) value.textContent = `${opacity}%`;
+  function updateControls() {
+    const enabled = radarEnabled();
+    const timeline = byId('weatherRadarTimeline');
+    const toggle = byId('weatherRadarToggle');
+    const opacityInput = byId('weatherRadarOpacity');
+    const opacityValue = byId('weatherRadarOpacityValue');
+    const history = byId('weatherRadarHistory');
+    const speed = byId('weatherRadarSpeed');
+    const loop = byId('weatherRadarLoop');
+    const play = byId('weatherRadarPlay');
+    const pause = byId('weatherRadarPause');
+    const frameTime = byId('weatherRadarFrameTime');
+
+    if (toggle) toggle.checked = enabled;
+    if (opacityInput) opacityInput.value = String(currentOpacity());
+    if (opacityValue) opacityValue.textContent = `${currentOpacity()}%`;
+    if (history) history.value = String(historyMinutes());
+    if (speed) speed.value = String(playbackSpeedMs());
+    if (loop) loop.checked = playbackLoops();
+
+    if (timeline) {
+      timeline.min = '0';
+      timeline.max = String(Math.max(0, radarFrames.length - 1));
+      timeline.value = String(Math.max(0, currentFrameIndex));
+      timeline.disabled = !enabled || radarFrames.length < 2;
+    }
+
+    if (play) play.disabled = !enabled || radarFrames.length < 2 || playbackRunning;
+    if (pause) pause.disabled = !playbackRunning;
+    if (frameTime) frameTime.textContent = relativeFrameText(currentFrameIndex);
   }
 
-  function refreshRadar() {
-    if (!radarLayer) return;
-    try { radarLayer.setUrl(radarUrl()); } catch (_) {}
-    try { radarLayer.redraw(); } catch (_) {}
+  function stopPlayback(announce) {
+    playbackRunning = false;
+    if (playbackTimer) {
+      window.clearTimeout(playbackTimer);
+      playbackTimer = null;
+    }
+    updateControls();
+    if (announce) setRadarStatus('Radar playback paused.', '');
+  }
+
+  function showFrame(index, announce) {
+    if (!radarFrames.length) return false;
+    currentFrameIndex = Math.max(0, Math.min(radarFrames.length - 1, Number(index) || 0));
+    const layer = ensureRadarLayer();
+    const frame = radarFrames[currentFrameIndex];
+    if (!layer || !frame) return false;
+
+    try { layer.setUrl(frameTileUrl(frame), false); } catch (_) {}
+    try { layer.setOpacity(currentOpacity() / 100); } catch (_) {}
+    try { layer.redraw(); } catch (_) {}
+
+    updateControls();
+    if (announce) setRadarStatus(`Showing radar frame ${relativeFrameText(currentFrameIndex)}.`, 'good');
+    return true;
+  }
+
+  function schedulePlaybackStep() {
+    if (!playbackRunning) return;
+    const newest = currentFrameIndex === radarFrames.length - 1;
+    playbackTimer = window.setTimeout(() => {
+      playbackTimer = null;
+      if (!playbackRunning || !radarFrames.length) return;
+
+      let next = currentFrameIndex + 1;
+      if (next >= radarFrames.length) {
+        if (!playbackLoops()) {
+          stopPlayback(false);
+          showFrame(radarFrames.length - 1, false);
+          setRadarStatus('Radar playback complete. Showing the latest frame.', 'good');
+          return;
+        }
+        next = 0;
+      }
+
+      showFrame(next, false);
+      schedulePlaybackStep();
+    }, newest ? NEWEST_FRAME_HOLD_MS : playbackSpeedMs());
+  }
+
+  function startPlayback() {
+    if (!radarEnabled() || radarFrames.length < 2) return;
+    if (currentFrameIndex >= radarFrames.length - 1) showFrame(0, false);
+    playbackRunning = true;
+    updateControls();
+    setRadarStatus(
+      `Playing ${historyMinutes()} minutes of radar history. ${radarFrames.length} frames loaded.`,
+      'good'
+    );
+    schedulePlaybackStep();
+  }
+
+  function selectedFrameTime() {
+    const frame = radarFrames[currentFrameIndex];
+    return frame ? Number(frame.time) : null;
+  }
+
+  function filterFrames(frames) {
+    const sorted = frames
+      .filter(frame => frame && Number.isFinite(Number(frame.time)) && frame.path)
+      .map(frame => ({time: Number(frame.time), path: String(frame.path)}))
+      .sort((left, right) => left.time - right.time);
+
+    if (!sorted.length) return [];
+    const newestTime = sorted[sorted.length - 1].time;
+    const minimumTime = newestTime - historyMinutes() * 60;
+    const filtered = sorted.filter(frame => frame.time >= minimumTime);
+    return filtered.length ? filtered : sorted.slice(-1);
+  }
+
+  async function loadRadarFrames(options) {
+    const settings = Object.assign({
+      forceLatest: false,
+      preserveTime: true
+    }, options || {});
+
+    if (loadingFrames) return false;
+    loadingFrames = true;
+    const previousTime = settings.preserveTime ? selectedFrameTime() : null;
+    const wasNewest = currentFrameIndex >= radarFrames.length - 1;
+    setRadarStatus('Loading recent weather radar frames…', 'warning');
+
+    try {
+      const response = await fetch(`${WEATHER_MAPS_URL}?rtp=${Date.now()}`, {cache: 'no-store'});
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const payload = await response.json();
+      const host = String(payload && payload.host || '').trim();
+      const past = payload && payload.radar && Array.isArray(payload.radar.past)
+        ? payload.radar.past
+        : [];
+
+      if (!host || !past.length) throw new Error('RainViewer returned no past radar frames.');
+
+      radarHost = host.replace(/\/+$/, '');
+      radarFrames = filterFrames(past);
+      if (!radarFrames.length) throw new Error('No radar frames matched the selected history range.');
+
+      if (settings.forceLatest || wasNewest || previousTime == null) {
+        currentFrameIndex = radarFrames.length - 1;
+      } else {
+        let bestIndex = 0;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        radarFrames.forEach((frame, index) => {
+          const distance = Math.abs(frame.time - previousTime);
+          if (distance < bestDistance) {
+            bestDistance = distance;
+            bestIndex = index;
+          }
+        });
+        currentFrameIndex = bestIndex;
+      }
+
+      if (radarEnabled()) showFrame(currentFrameIndex, false);
+      updateControls();
+
+      const generated = Number(payload.generated);
+      const generatedText = Number.isFinite(generated)
+        ? new Date(generated * 1000).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'})
+        : 'now';
+
+      setRadarStatus(
+        `Loaded ${radarFrames.length} radar frames. Latest: ${relativeFrameText(radarFrames.length - 1)}. Refreshed ${generatedText}.`,
+        'good'
+      );
+      return true;
+    } catch (error) {
+      setRadarStatus(`Weather radar update failed: ${error.message || error}`, 'error');
+      return false;
+    } finally {
+      loadingFrames = false;
+      updateControls();
+    }
   }
 
   function stopRefreshTimer() {
@@ -3749,36 +3788,41 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
 
   function startRefreshTimer() {
     stopRefreshTimer();
-    refreshTimer = window.setInterval(refreshRadar, REFRESH_MS);
+    refreshTimer = window.setInterval(() => {
+      if (radarEnabled()) loadRadarFrames({preserveTime: true});
+    }, REFRESH_MS);
   }
 
-  function enableRadar(enabled, announce) {
-    const map = getMap();
-    if (!map || typeof L === 'undefined') return false;
+  async function setEnabled(enabled, announce) {
     const active = Boolean(enabled);
     localStorage.setItem(ENABLED_KEY, active ? '1' : '0');
 
-    if (active) {
-      if (!radarLayer) radarLayer = createRadarLayer(map);
-      if (!radarLayer) return false;
-      try {
-        if (!map.hasLayer(radarLayer)) radarLayer.addTo(map);
-      } catch (_) {
-        try { radarLayer.addTo(map); } catch (_e) { return false; }
-      }
-      try { radarLayer.setOpacity(currentOpacity() / 100); } catch (_) {}
-      refreshRadar();
-      startRefreshTimer();
-      if (announce) setStatus('Weather radar overlay enabled.', 'good');
-    } else {
+    if (!active) {
+      stopPlayback(false);
       stopRefreshTimer();
+      const map = mapInstance();
       try {
-        if (radarLayer && map.hasLayer(radarLayer)) map.removeLayer(radarLayer);
+        if (map && radarLayer && map.hasLayer(radarLayer)) map.removeLayer(radarLayer);
       } catch (_) {}
-      if (announce) setStatus('Weather radar overlay disabled.', '');
+      updateControls();
+      if (announce) setRadarStatus('Weather radar overlay disabled.', '');
+      return true;
     }
 
-    updateControls(active);
+    const loaded = radarFrames.length
+      ? true
+      : await loadRadarFrames({forceLatest: true, preserveTime: false});
+
+    if (!loaded && !radarFrames.length) {
+      localStorage.setItem(ENABLED_KEY, '0');
+      updateControls();
+      return false;
+    }
+
+    showFrame(currentFrameIndex >= 0 ? currentFrameIndex : radarFrames.length - 1, false);
+    startRefreshTimer();
+    updateControls();
+    if (announce) setRadarStatus('Weather radar overlay enabled on the latest frame.', 'good');
     return true;
   }
 
@@ -3790,48 +3834,81 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
     if (radarLayer) {
       try { radarLayer.setOpacity(opacity / 100); } catch (_) {}
     }
-    updateControls(localStorage.getItem(ENABLED_KEY) === '1');
+    updateControls();
   }
 
-  function installControls() {
-    if (installedControls || getElement('weatherRadarControls')) return true;
-    const map = getMap();
-    const toolbar = document.querySelector('.map-toolbar');
-    if (!map || !toolbar) return false;
+  function setHistory(value) {
+    localStorage.setItem(HISTORY_KEY, Number(value) === 120 ? '120' : '60');
+    stopPlayback(false);
+    if (radarEnabled()) loadRadarFrames({forceLatest: true, preserveTime: false});
+    else updateControls();
+  }
 
-    const controls = document.createElement('div');
-    controls.id = 'weatherRadarControls';
-    controls.className = 'map-weather-controls';
-    controls.innerHTML = [
-      '<label class="map-weather-toggle" title="Overlay current NEXRAD base reflectivity radar">',
-      '<input id="weatherRadarToggle" type="checkbox"> Radar',
-      '</label>',
-      '<label class="map-weather-opacity" title="Weather radar overlay opacity">',
-      '<span>Opacity</span>',
-      `<input id="weatherRadarOpacity" type="range" min="${MIN_OPACITY}" max="${MAX_OPACITY}" step="5" value="${currentOpacity()}">`,
-      `<span id="weatherRadarOpacityValue">${currentOpacity()}%</span>`,
-      '</label>',
-      '<button id="weatherRadarRefresh" type="button" title="Refresh radar tiles now">Refresh Radar</button>'
-    ].join('');
+  function bindControls() {
+    if (controlsBound) return true;
+    const toggle = byId('weatherRadarToggle');
+    const opacity = byId('weatherRadarOpacity');
+    const refresh = byId('weatherRadarRefresh');
+    const play = byId('weatherRadarPlay');
+    const pause = byId('weatherRadarPause');
+    const history = byId('weatherRadarHistory');
+    const speed = byId('weatherRadarSpeed');
+    const loop = byId('weatherRadarLoop');
+    const timeline = byId('weatherRadarTimeline');
 
-    const message = getElement('mapMessage');
-    if (message && message.parentElement === toolbar) toolbar.insertBefore(controls, message);
-    else toolbar.appendChild(controls);
-
-    const toggle = getElement('weatherRadarToggle');
-    const slider = getElement('weatherRadarOpacity');
-    const refresh = getElement('weatherRadarRefresh');
-
-    if (toggle) toggle.addEventListener('change', () => enableRadar(toggle.checked, true));
-    if (slider) slider.addEventListener('input', () => setOpacity(slider.value));
+    if (toggle) toggle.addEventListener('change', () => setEnabled(toggle.checked, true));
+    if (opacity) opacity.addEventListener('input', () => setOpacity(opacity.value));
     if (refresh) refresh.addEventListener('click', () => {
-      refreshRadar();
-      setStatus('Weather radar overlay refreshed.', 'good');
+      stopPlayback(false);
+      loadRadarFrames({forceLatest: true, preserveTime: false});
+    });
+    if (play) play.addEventListener('click', startPlayback);
+    if (pause) pause.addEventListener('click', () => stopPlayback(true));
+    if (history) history.addEventListener('change', () => setHistory(history.value));
+    if (speed) speed.addEventListener('change', () => {
+      const parsed = Number(speed.value);
+      localStorage.setItem(SPEED_KEY, String([550, 900, 1400].includes(parsed) ? parsed : DEFAULT_SPEED_MS));
+      if (playbackRunning) {
+        if (playbackTimer) window.clearTimeout(playbackTimer);
+        playbackTimer = null;
+        schedulePlaybackStep();
+      }
+      updateControls();
+    });
+    if (loop) loop.addEventListener('change', () => {
+      localStorage.setItem(LOOP_KEY, loop.checked ? '1' : '0');
+      updateControls();
+    });
+    if (timeline) timeline.addEventListener('input', () => {
+      stopPlayback(false);
+      showFrame(Number(timeline.value), true);
     });
 
-    installedControls = true;
-    updateControls(localStorage.getItem(ENABLED_KEY) === '1');
-    if (localStorage.getItem(ENABLED_KEY) === '1') enableRadar(true, false);
+    controlsBound = true;
+    updateControls();
+    return true;
+  }
+
+  function install() {
+    if (!mapInstance()) return false;
+    bindControls();
+    updateControls();
+
+    if (radarEnabled()) setEnabled(true, false);
+    else setRadarStatus('Radar is off. Enable it to load recent radar frames.', '');
+
+    window.__rtpWeatherRadarHistoryMenuV1 = {
+      installed: true,
+      refreshIntervalMs: REFRESH_MS,
+      api: WEATHER_MAPS_URL,
+      get enabled() { return radarEnabled(); },
+      get frameCount() { return radarFrames.length; },
+      get currentFrameIndex() { return currentFrameIndex; },
+      get playbackRunning() { return playbackRunning; },
+      refresh: () => loadRadarFrames({forceLatest: true, preserveTime: false}),
+      play: startPlayback,
+      pause: () => stopPlayback(false)
+    };
     return true;
   }
 
@@ -3839,14 +3916,25 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
     let attempts = 0;
     const timer = window.setInterval(() => {
       attempts += 1;
-      if (installControls() || attempts >= 80) window.clearInterval(timer);
+      if (install() || attempts >= 120) window.clearInterval(timer);
     }, 250);
-    installControls();
+    install();
   }
+
+  window.addEventListener('storage', event => {
+    if ([ENABLED_KEY, OPACITY_KEY, HISTORY_KEY, SPEED_KEY, LOOP_KEY].includes(event.key)) {
+      updateControls();
+      if (event.key === ENABLED_KEY) setEnabled(radarEnabled(), false);
+      if (event.key === OPACITY_KEY && radarLayer) {
+        try { radarLayer.setOpacity(currentOpacity() / 100); } catch (_) {}
+      }
+    }
+  });
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 })();
+/* RTP_WEATHER_RADAR_HISTORY_MENU_V1_END */
 
 /* ACTIVE_TRAIL_CLEANUP_V2_START */
 (function(){

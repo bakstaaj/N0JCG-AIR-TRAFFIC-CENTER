@@ -318,99 +318,60 @@ body { padding: 0; }
 .noaa-debug-state { color:#c9d8e8; min-width:112px; }
 .noaa-debug-state.recording { color:#ffca4b; font-weight:700; }
 
-/* BEGIN Phase 1 weather radar overlay controls */
-.map-weather-controls {
+/* RTP_WEATHER_RADAR_HISTORY_MENU_V1_START */
+.weather-radar-menu {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 9px;
+}
+.weather-radar-row {
+  display: flex;
   align-items: center;
-  gap: 4px 8px;
-  padding: 3px 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: rgba(8, 16, 29, .82);
+  flex-wrap: wrap;
+  gap: 7px;
 }
-
-.map-weather-controls label {
-  margin: 0;
+.weather-radar-row > label:not(.source-toggle) {
+  flex: 1 1 120px;
 }
-
-.map-weather-toggle {
+.weather-radar-toggle,
+.weather-radar-loop {
+  width: fit-content;
+}
+.weather-radar-slider-label {
+  display: flex !important;
+  flex-direction: column;
+  gap: 4px !important;
+  margin: 0 !important;
+}
+.weather-radar-slider-label > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.weather-radar-slider-label strong {
+  color: var(--text);
   font-weight: 600;
 }
-
-.map-weather-toggle input {
-  width: auto;
-  margin: 0 4px 0 0;
-  vertical-align: middle;
-}
-
-.map-weather-opacity {
-  display: flex !important;
-  align-items: center;
-  gap: 5px !important;
-  white-space: nowrap;
-}
-
-.map-weather-opacity input[type="range"] {
-  width: 86px;
+.weather-radar-slider-label input[type="range"] {
+  width: 100%;
   margin: 0;
   padding: 0;
 }
-
-#weatherRadarOpacityValue {
-  min-width: 34px;
-  color: var(--muted);
-  font-size: 10px;
-  text-align: right;
+.weather-radar-playback-row button {
+  min-width: 66px;
 }
-
-#weatherRadarRefresh {
-  padding: 4px 7px;
-  min-height: 24px;
-  font-size: 10px;
+.weather-radar-playback-row select {
+  min-width: 112px;
 }
-/* END Phase 1 weather radar overlay controls */
-
-/* Phase 1 weather radar map overlay controls V2 */
-.map-weather-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  padding: 3px 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: rgba(8, 16, 29, .82);
+.weather-radar-timeline-label input:disabled {
+  opacity: .55;
 }
-.map-weather-controls label { margin: 0; }
-.map-weather-toggle { font-weight: 600; }
-.map-weather-toggle input {
-  width: auto;
-  margin: 0 4px 0 0;
-  vertical-align: middle;
+#weatherRadarStatus {
+  margin-top: 0;
 }
-.map-weather-opacity {
-  display: flex !important;
-  align-items: center;
-  gap: 5px !important;
-  white-space: nowrap;
-}
-.map-weather-opacity input[type="range"] {
-  width: 86px;
-  margin: 0;
-  padding: 0;
-}
-#weatherRadarOpacityValue {
-  min-width: 34px;
-  color: var(--muted);
-  font-size: 10px;
-  text-align: right;
-}
-#weatherRadarRefresh {
-  padding: 4px 7px;
-  min-height: 24px;
-  font-size: 10px;
-}
+/* RTP_WEATHER_RADAR_HISTORY_MENU_V1_END */
 
 /* MAP_POPOUT_FULLSCREEN_V1_START */
 .map-popout-control {

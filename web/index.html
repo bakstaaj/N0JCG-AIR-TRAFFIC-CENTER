@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 
-<link rel="stylesheet" href="app.css?v=refactor-assets">
+<link rel="stylesheet" href="app.css?v=weather-radar-history-menu-v1">
 </head>
 <body>
 <header class="app-header">
@@ -132,6 +132,57 @@
           <button id="erasePiTrails" class="stop" type="button">Erase History</button>
         </div>
       </div>
+
+
+      <details id="weatherRadarDetails" class="menu-nested">
+        <summary>Weather Radar</summary>
+        <div id="weatherRadarControls" class="menu-group weather-radar-menu">
+          <div class="weather-radar-row">
+            <label class="source-toggle weather-radar-toggle">
+              <input id="weatherRadarToggle" type="checkbox"> Show Radar
+            </label>
+            <button id="weatherRadarRefresh" type="button">Refresh Radar</button>
+          </div>
+
+          <label class="weather-radar-slider-label">
+            <span>Opacity <strong id="weatherRadarOpacityValue">45%</strong></span>
+            <input id="weatherRadarOpacity" type="range" min="15" max="85" step="5" value="45">
+          </label>
+
+          <div class="weather-radar-row weather-radar-playback-row">
+            <button id="weatherRadarPlay" type="button">Play</button>
+            <button id="weatherRadarPause" type="button" disabled>Pause</button>
+            <label>History
+              <select id="weatherRadarHistory">
+                <option value="60" selected>Previous 1 hour</option>
+                <option value="120">Previous 2 hours</option>
+              </select>
+            </label>
+            <label>Speed
+              <select id="weatherRadarSpeed">
+                <option value="1400">Slow</option>
+                <option value="900" selected>Normal</option>
+                <option value="550">Fast</option>
+              </select>
+            </label>
+            <label class="source-toggle weather-radar-loop">
+              <input id="weatherRadarLoop" type="checkbox" checked> Loop
+            </label>
+          </div>
+
+          <label class="weather-radar-slider-label weather-radar-timeline-label">
+            <span>Timeline <strong id="weatherRadarFrameTime">Latest frame</strong></span>
+            <input id="weatherRadarTimeline" type="range" min="0" max="0" step="1" value="0" disabled>
+          </label>
+
+          <div id="weatherRadarStatus" class="message compact-message">
+            Radar is off. Enable it to load recent radar frames.
+          </div>
+          <p class="menu-help">
+            Past precipitation radar is supplied by RainViewer. The frame list refreshes every five minutes.
+          </p>
+        </div>
+      </details>
 
       <details class="menu-nested">
         <summary>Aircraft Route Lookup — AirLabs</summary>
@@ -275,7 +326,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="app.js?v=initial-map-reload-30-miles-v1"></script>
+<script src="app.js?v=weather-radar-history-menu-v1"></script>
 
 
 
