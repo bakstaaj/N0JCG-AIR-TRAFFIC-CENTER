@@ -58,9 +58,13 @@ from rtl_windows_backend import (
 )
 
 LOG = logging.getLogger("rtl_windows_pi_port_backend")
-# NOAA_162500_VALIDATED_PROFILE_V1:
-# Only 162.500 MHz is valid at this installed receiver location.
-NOAA_FREQUENCIES = [162500000]
+# NOAA_RF_FIRST_SCAN_LIVE_HANDOFF_V1:
+# Scan all seven standard NOAA Weather Radio channels. Receiver tuning is
+# fixed, but the selected station remains location-dependent.
+NOAA_FREQUENCIES = [
+    162400000, 162425000, 162450000, 162475000,
+    162500000, 162525000, 162550000,
+]
 DEFAULT_RADIUS_MILES = 100.0
 DEFAULT_AIRBAND_ACTIVITY_RMS = 1300.0
 DEFAULT_AIRBAND_RF_GAIN_DB = float(AIRBAND_LIVE_AUDIO_PROFILE.get("gain_db", 40.2))
@@ -203,22 +207,15 @@ class PiPortSettingsStore(SettingsStore):
                 selection = loaded.get("noaa_selection")
                 if (
                     isinstance(selection, dict)
-                    and int(selection.get("frequency_hz", 0)) == int(NOAA_PROFILE["frequency_hz"])
+                    and int(selection.get("frequency_hz", 0)) in NOAA_FREQUENCIES
                 ):
-                    self.noaa_frequency_hz = int(NOAA_PROFILE["frequency_hz"])
-                    self.noaa_station = str(
-                        selection.get("station") or "Fixed local NOAA — 162.500 MHz"
-                    )
+                    self.noaa_frequency_hz = int(selection["frequency_hz"])
+                    self.noaa_station = str(selection.get("station") or self.noaa_station)
                     self.noaa_selection_location_key = (
                         str(selection.get("receiver_location_key") or "").strip() or None
                     )
             except Exception as exc:
                 LOG.warning("Unable to read Pi-port extended settings: %s", exc)
-        # Discard any previously saved adjacent-channel result.
-        self.noaa_frequency_hz = int(NOAA_PROFILE["frequency_hz"])
-        self.noaa_station = "Fixed local NOAA — 162.500 MHz"
-        if not self.noaa_selection_location_key:
-            self.noaa_selection_location_key = self.noaa_location_key()
 
     @staticmethod
     def _validate_radius(value: Any) -> float:
@@ -399,20 +396,18 @@ class PiPortSettingsStore(SettingsStore):
         return self.airband_tuning()
 
     def save_noaa_selection(self, frequency_hz: int, station: str) -> None:
-        fixed_frequency_hz = int(NOAA_PROFILE["frequency_hz"])
-        if int(frequency_hz) != fixed_frequency_hz:
-            raise ValueError(
-                f"This receiver location is locked to {fixed_frequency_hz / 1_000_000:.3f} MHz NOAA."
-            )
-        self.noaa_frequency_hz = fixed_frequency_hz
-        self.noaa_station = "Fixed local NOAA — 162.500 MHz"
+        frequency_hz = int(frequency_hz)
+        if frequency_hz not in NOAA_FREQUENCIES:
+            raise ValueError("Selected NOAA frequency is not a standard NOAA channel.")
+        self.noaa_frequency_hz = frequency_hz
+        self.noaa_station = str(station)
         self.noaa_selection_location_key = self.noaa_location_key()
         self._persist_port_settings()
 
     def reset_noaa_selection(self) -> None:
         self.noaa_frequency_hz = int(NOAA_PROFILE["frequency_hz"])
-        self.noaa_station = "Fixed local NOAA — 162.500 MHz"
-        self.noaa_selection_location_key = self.noaa_location_key()
+        self.noaa_station = "Selection cleared — awaiting Fast NOAA scan"
+        self.noaa_selection_location_key = None
         self._persist_port_settings()
 
 
@@ -760,43 +755,176 @@ class AudioOperations:
             return rows
 
     def survey_noaa(self, settings: PiPortSettingsStore) -> dict[str, Any]:
-        # NOAA_DIRECT_START_162500_V1:
-        # Revalidation is audio-only on the installed fixed NOAA channel.
-        fixed_frequency_hz = int(NOAA_PROFILE["frequency_hz"])
-        profile = dict(NOAA_PROFILE)
-        profile["frequency_hz"] = fixed_frequency_hz
-        profile["rtl_fm_mode"] = "fm"
-        wav_content = self._capture_profile(profile, 2.0)
-        quality = noaa_audio_quality_from_wav(wav_content)
-        settings.save_noaa_selection(
-            fixed_frequency_hz,
-            "Fixed local NOAA — 162.500 MHz",
+        # NOAA_RF_FIRST_SCAN_LIVE_HANDOFF_V1:
+        # Measure every standard NOAA carrier in one RF sweep. A carrier that
+        # leads by at least 4 dB wins after audio confirmation. Audio quality is
+        # used only to resolve close RF candidates.
+        spectrum_gain_db = float(NOAA_PROFILE.get("gain_db", DEFAULT_AIRBAND_RF_GAIN_DB))
+        rows = self.capture_airband_spectrum(
+            FAST_NOAA_LOW_HZ,
+            FAST_NOAA_HIGH_HZ,
+            FAST_NOAA_BIN_HZ,
+            spectrum_gain_db,
         )
-        LOG.info(
-            "Fixed NOAA revalidation completed at %.3f MHz: quality %.2f dB RMS %.2f",
-            fixed_frequency_hz / 1_000_000,
-            float(quality.get("quality_db", -99.0)),
-            float(quality.get("rms_sample", 0.0)),
+        time.sleep(max(0.0, AUDIO_RTL_RELEASE_SETTLE_SECONDS))
+
+        rf_results: list[dict[str, Any]] = []
+        for frequency_hz in NOAA_FREQUENCIES:
+            selected: dict[str, float] | None = None
+            for row in rows:
+                low = float(row["low_hz"])
+                high = float(row["high_hz"])
+                step = float(row["step_hz"])
+                if not low <= frequency_hz <= high or step <= 0:
+                    continue
+                center = int(round((frequency_hz - low) / step))
+                powers = row["powers_db"]
+                nearby = [
+                    float(powers[index])
+                    for index in (center - 1, center, center + 1)
+                    if 0 <= index < len(powers)
+                ]
+                if not nearby:
+                    continue
+                power_db = max(nearby)
+                margin_db = power_db - float(row["noise_floor_db"])
+                if selected is None or margin_db > selected["carrier_margin_db"]:
+                    selected = {
+                        "carrier_power_db": power_db,
+                        "carrier_margin_db": margin_db,
+                    }
+            if selected is not None:
+                rf_results.append({
+                    "frequency_hz": frequency_hz,
+                    "carrier_power_db": round(selected["carrier_power_db"], 2),
+                    "carrier_margin_db": round(selected["carrier_margin_db"], 2),
+                })
+
+        if len(rf_results) != len(NOAA_FREQUENCIES):
+            raise RuntimeError(
+                f"Fast NOAA scan measured {len(rf_results)} of "
+                f"{len(NOAA_FREQUENCIES)} standard channels."
+            )
+
+        rf_results.sort(
+            key=lambda row: (row["carrier_margin_db"], row["carrier_power_db"]),
+            reverse=True,
         )
-        return {
-            "best_frequency_hz": fixed_frequency_hz,
-            "channels": [{
-                "frequency_hz": fixed_frequency_hz,
-                "validated_fixed_channel": True,
-            }],
-            "validated_channels": [{
-                "frequency_hz": fixed_frequency_hz,
+        best_rf = rf_results[0]
+        second_rf = rf_results[1]
+        dominance_db = (
+            float(best_rf["carrier_margin_db"])
+            - float(second_rf["carrier_margin_db"])
+        )
+        close_margin_db = 4.0
+
+        validate_hz = [
+            int(row["frequency_hz"])
+            for row in rf_results
+            if float(row["carrier_margin_db"])
+            >= float(best_rf["carrier_margin_db"]) - close_margin_db
+        ][:3]
+
+        transient_tokens = (
+            "usb_claim_interface error -6",
+            "failed to open rtlsdr device",
+            "no supported devices found",
+            "device or resource busy",
+            "resource busy",
+        )
+        validated: list[dict[str, Any]] = []
+
+        for frequency_hz in validate_hz:
+            rf = next(
+                row for row in rf_results
+                if int(row["frequency_hz"]) == frequency_hz
+            )
+            profile = dict(NOAA_PROFILE)
+            profile["frequency_hz"] = frequency_hz
+            profile["rtl_fm_mode"] = "fm"
+
+            wav_content: bytes | None = None
+            last_error = ""
+            for settle_seconds in (0.75, 1.50, 3.00):
+                time.sleep(settle_seconds)
+                try:
+                    wav_content = self._capture_profile(profile, 2.0)
+                    break
+                except Exception as exc:
+                    last_error = str(exc)
+                    if not any(
+                        token in last_error.lower()
+                        for token in transient_tokens
+                    ):
+                        raise
+                    LOG.warning(
+                        "NOAA validation receiver claim failed at %.3f MHz "
+                        "after %.2fs settle: %s",
+                        frequency_hz / 1_000_000,
+                        settle_seconds,
+                        last_error,
+                    )
+
+            if wav_content is None:
+                raise RuntimeError(
+                    f"NOAA audio validation failed at "
+                    f"{frequency_hz / 1_000_000:.3f} MHz: "
+                    f"{last_error or 'no audio returned'}"
+                )
+
+            quality = noaa_audio_quality_from_wav(wav_content)
+            validated.append({
+                **rf,
                 **quality,
+                "audio_quality_db": float(quality.get("quality_db", -99.0)),
+                "program_rms_sample": float(
+                    quality.get(
+                        "smooth_rms_sample",
+                        quality.get("rms_sample", 0.0),
+                    )
+                ),
                 "validated_nfm": True,
-                "validated_fixed_channel": True,
-            }],
-            "station": "Fixed local NOAA — 162.500 MHz",
-            "selected_audio_quality_db": quality.get("quality_db"),
-            "selected_audio_rms_sample": quality.get("rms_sample"),
-            "rf_scanned_frequency_count": 0,
-            "audio_validated_frequency_count": 1,
-            "selection_policy": "fixed_162_500_mhz_audio_revalidation_only",
-            "scan_range_hz": [fixed_frequency_hz, fixed_frequency_hz],
+            })
+            time.sleep(max(0.0, AUDIO_RTL_RELEASE_SETTLE_SECONDS))
+
+        if dominance_db >= close_margin_db:
+            best = next(
+                row for row in validated
+                if int(row["frequency_hz"]) == int(best_rf["frequency_hz"])
+            )
+            selection_policy = "dominant_rf_carrier_with_audio_confirmation"
+        else:
+            validated.sort(
+                key=lambda row: (
+                    row["audio_quality_db"],
+                    row["carrier_margin_db"],
+                    row["program_rms_sample"],
+                ),
+                reverse=True,
+            )
+            best = validated[0]
+            selection_policy = "rf_close_candidates_audio_tiebreak"
+
+        station = (
+            f"AUTO RF+AUDIO SELECT — "
+            f"{best['frequency_hz'] / 1_000_000:.3f} MHz"
+        )
+        settings.save_noaa_selection(int(best["frequency_hz"]), station)
+
+        return {
+            "best_frequency_hz": best["frequency_hz"],
+            "channels": rf_results,
+            "validated_channels": validated,
+            "station": station,
+            "selected_carrier_power_db": best["carrier_power_db"],
+            "selected_carrier_margin_db": best["carrier_margin_db"],
+            "selected_audio_quality_db": best.get("audio_quality_db"),
+            "selected_audio_rms_sample": best.get("rms_sample"),
+            "rf_dominance_db": round(dominance_db, 2),
+            "rf_scanned_frequency_count": len(rf_results),
+            "audio_validated_frequency_count": len(validated),
+            "selection_policy": selection_policy,
+            "scan_range_hz": [FAST_NOAA_LOW_HZ, FAST_NOAA_HIGH_HZ],
         }
 
 
@@ -2200,13 +2328,13 @@ class PiPortHandler(BaseHTTPRequestHandler):
             "audio_receiver_serial": AUDIO_SERIAL,
             "noaa_station": self.settings.noaa_station,
             "noaa_frequency_hz": self.settings.noaa_frequency_hz,
-            "configured_noaa_station": "Fixed local NOAA channel",
+            "configured_noaa_station": "Validated local NOAA channel",
             "configured_noaa_frequency_hz": int(NOAA_PROFILE["frequency_hz"]),
             "saved_noaa_selection_available": True,
             "saved_noaa_frequency_hz": self.settings.noaa_frequency_hz,
             "saved_noaa_station": self.settings.noaa_station,
             "saved_noaa_selection_current_location": self.settings.can_reuse_noaa_selection(),
-            "noaa_start_policy": "fixed_162_500_mhz_validated_local_profile",
+            "noaa_start_policy": "reuse_saved_verified_channel_until_location_change_or_manual_rescan",
             "noaa_profile": dict(NOAA_PROFILE),
             "rf_gain_db": NOAA_PROFILE["gain_db"],
             "audio_output_gain": None,
@@ -2402,45 +2530,47 @@ class PiPortHandler(BaseHTTPRequestHandler):
                 self.audio_ops.live_noaa_stop()
                 self.send_json({"stopped": True, **self.port_status()})
             elif request.path in ("/api/noaa/auto/start", "/api/noaa/auto/rescan"):
-                # NOAA_DIRECT_START_162500_V1:
-                # Start bypasses channel discovery. Revalidate checks only 162.500 MHz.
+                # NOAA_RF_FIRST_SCAN_LIVE_HANDOFF_V1:
                 if self.scan.status()["airband_scan_running"]:
                     self.scan.stop()
+                reset_requested = request.path.endswith("/rescan")
                 if self.audio_ops.noaa_live_active:
                     self.audio_ops.live_noaa_stop()
                 elif self.audio.live_is_running():
                     self.audio.stop_live()
 
-                fixed_frequency_hz = int(NOAA_PROFILE["frequency_hz"])
-                self.settings.save_noaa_selection(
-                    fixed_frequency_hz,
-                    "Fixed local NOAA — 162.500 MHz",
-                )
+                if reset_requested:
+                    self.settings.reset_noaa_selection()
 
-                revalidate_requested = request.path.endswith("/rescan")
-                survey = None
-                if revalidate_requested:
+                rescan_reason = (
+                    "manual_rescan"
+                    if reset_requested
+                    else self.settings.noaa_selection_rescan_reason()
+                )
+                scan_required = bool(rescan_reason)
+
+                if scan_required:
                     survey = self.audio_ops.survey_noaa(self.settings)
                     time.sleep(max(0.0, AUDIO_RTL_RELEASE_SETTLE_SECONDS))
+                else:
+                    survey = None
 
-                started_at = time.monotonic()
+                startup_started = time.monotonic()
                 startup = self.audio_ops.live_noaa_start(self.settings)
-                startup_seconds = round(time.monotonic() - started_at, 3)
+                startup_seconds = round(
+                    time.monotonic() - startup_started,
+                    3,
+                )
 
                 self.send_json({
                     "started": True,
-                    "reset_requested": revalidate_requested,
-                    "saved_channel_reused": True,
-                    "rescan_reason": (
-                        "manual_fixed_channel_revalidation"
-                        if revalidate_requested else None
-                    ),
-                    "full_channel_scan": False,
-                    "channel_discovery_bypassed": True,
-                    "fixed_frequency_hz": fixed_frequency_hz,
-                    "startup_seconds": startup_seconds,
-                    "startup": startup,
+                    "reset_requested": reset_requested,
+                    "saved_channel_reused": not scan_required,
+                    "rescan_reason": rescan_reason,
+                    "full_channel_scan": scan_required,
                     "survey": survey,
+                    "startup": startup,
+                    "startup_seconds": startup_seconds,
                     **self.port_status(),
                 })
             elif request.path == "/api/airband/scan/activity/start":

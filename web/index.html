@@ -73,7 +73,7 @@
             <input id="locationRadius" type="number" min="1" max="500" value="25" step="1">
           </label>
           <button id="saveAirbandRadius" type="button">Apply Radius</button>
-          <button id="rescanNoaaChannel" type="button">Revalidate 162.500 MHz</button>
+          <button id="rescanNoaaChannel" type="button">Reset &amp; Rescan NOAA</button>
         </div>
         <div id="airbandRadiusMessage" class="message compact-message">Current Airband radius will be loaded from the saved receiver location.</div>
         <div class="airband-tuning-controls">
@@ -218,7 +218,7 @@
           <button id="capture10" type="button">Capture 10 sec</button>
           <audio id="audioPlayer" controls preload="none"></audio>
           <div id="audioMessage" class="message compact-message">Ready for NOAA diagnostics.</div>
-          <div id="surveyResult" class="message compact-message">NOAA is fixed at 162.500 MHz for this receiver location. Revalidate checks RF and audio on that channel only.</div>
+          <div id="surveyResult" class="message compact-message">NOAA Start uses the saved verified channel when the receiver location is unchanged. Reset &amp; Rescan runs fast carrier search followed by clear-audio validation.</div>
         </div>
       </details>
 
