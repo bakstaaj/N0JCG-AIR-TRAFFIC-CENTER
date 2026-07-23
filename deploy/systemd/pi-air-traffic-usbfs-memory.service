@@ -1,0 +1,13 @@
+[Unit]
+Description=Set USBFS memory ceiling for concurrent RTL-SDR receivers
+Documentation=https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
+After=systemd-modules-load.service
+Before=pi-air-traffic-tracker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'test -w /sys/module/usbcore/parameters/usbfs_memory_mb && echo 0 > /sys/module/usbcore/parameters/usbfs_memory_mb'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
