@@ -443,7 +443,4 @@ body.map-popout-window .leaflet-container {
 #mapWeatherRadarPlaybackToggle {
   min-width: 86px;
 }
-.map-toolbar #mapMessage:empty {
-  display: none;
-}
 /* RTP_MAP_RADAR_PLAYBACK_TOGGLE_V1_END */
