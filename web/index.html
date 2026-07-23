@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 
-<link rel="stylesheet" href="app.css?v=weather-radar-history-menu-v1">
+<link rel="stylesheet" href="app.css?v=map-radar-play-toggle-v1">
 </head>
 <body>
 <header class="app-header">
@@ -264,7 +264,7 @@
   </section>
 </nav>
 <main class="focus-layout">
-  <section class="map-panel"><div class="map-toolbar"><button id="fitAircraftMap" type="button">Fit Aircraft</button><button id="centerReceiverMap" type="button">Center Receiver</button><button id="clearAircraftTrails" type="button">Clear Display</button><button id="loadPiTrails" type="button">Restore History</button><div id="mapMessage" class="message">Waiting for aircraft positions from readsb.</div>
+  <section class="map-panel"><div class="map-toolbar"><button id="fitAircraftMap" type="button">Fit Aircraft</button><button id="centerReceiverMap" type="button">Center Receiver</button><button id="clearAircraftTrails" type="button">Clear Display</button><button id="loadPiTrails" type="button">Restore History</button><button id="mapWeatherRadarPlaybackToggle" type="button">Play Radar</button><div id="mapMessage" class="message">Waiting for aircraft positions from readsb.</div>
       </div><div id="aircraftMap"></div><div class="map-footer"><div class="trail-legend"><span><i class="legend-line" style="border-color:#39ff14"></i>&lt; 5,001 ft</span><span><i class="legend-line" style="border-color:#087830"></i>&lt; 10,001 ft</span><span><i class="legend-line" style="border-color:#39cfff"></i>&lt; 20,001 ft</span><span><i class="legend-line" style="border-color:#1851b5"></i>&lt; 30,001 ft</span><span><i class="legend-line" style="border-color:#d4a600"></i>&lt; 40,001 ft</span><span><i class="legend-line" style="border-color:#ff3030"></i>&gt; 40,000 ft</span></div><div class="map-footer-status"><div id="stationDetail">Loading NOAA receiver information…</div><div id="airbandTuningDetail">Airband Tuning: loading…</div>
           <div id="mapAirbandScannerActions" class="map-scanner-actions">
             <button id="mapAirbandSkipHeld" type="button" disabled>Skip</button>
@@ -326,7 +326,7 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="app.js?v=weather-radar-history-menu-v1"></script>
+<script src="app.js?v=map-radar-play-toggle-v1"></script>
 
 
 

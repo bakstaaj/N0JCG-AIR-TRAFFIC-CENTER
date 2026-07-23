@@ -922,9 +922,17 @@ function updateAircraftMap(aircraftRecords) {
     }
   }
 
-  setMessage('mapMessage',
-    positioned.length ? `Displaying ${positioned.length} aircraft with positions. Click an aircraft for details.` : 'No positioned aircraft currently reported by readsb.',
-    positioned.length ? 'good' : '');
+  const mapStatusNode = el('mapMessage');
+  if (!positioned.length) {
+    setMessage('mapMessage', 'No positioned aircraft currently reported by readsb.', '');
+  } else if (
+    mapStatusNode &&
+    /^(Waiting for aircraft positions|Displaying \d+ aircraft with positions)/.test(
+      String(mapStatusNode.textContent || '').trim()
+    )
+  ) {
+    setMessage('mapMessage', '', '');
+  }
 
   if (aircraftMapFirstFit && receiverMapLocation && positioned.length) {
     const points = positioned.map(item => [Number(item.lat), Number(item.lon)]);
@@ -3906,6 +3914,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
       get currentFrameIndex() { return currentFrameIndex; },
       get playbackRunning() { return playbackRunning; },
       refresh: () => loadRadarFrames({forceLatest: true, preserveTime: false}),
+      enable: () => setEnabled(true, false),
       play: startPlayback,
       pause: () => stopPlayback(false)
     };
@@ -3935,6 +3944,116 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   else boot();
 })();
 /* RTP_WEATHER_RADAR_HISTORY_MENU_V1_END */
+
+/* RTP_MAP_RADAR_PLAYBACK_TOGGLE_V1_START */
+(() => {
+  'use strict';
+  if (window.__rtpMapRadarPlaybackToggleV1Installed) return;
+  window.__rtpMapRadarPlaybackToggleV1Installed = true;
+
+  const BUTTON_ID = 'mapWeatherRadarPlaybackToggle';
+  let clickBound = false;
+  let actionRunning = false;
+
+  function radarApi() {
+    const api = window.__rtpWeatherRadarHistoryMenuV1;
+    return api && api.installed ? api : null;
+  }
+
+  function buttonNode() {
+    return document.getElementById(BUTTON_ID);
+  }
+
+  function updateButton() {
+    const button = buttonNode();
+    if (!button) return false;
+
+    const api = radarApi();
+    const playing = Boolean(api && api.playbackRunning);
+
+    button.textContent = playing ? 'Stop Radar' : 'Play Radar';
+    button.classList.toggle('stop', playing);
+    button.disabled = actionRunning || !api;
+    button.setAttribute('aria-pressed', playing ? 'true' : 'false');
+    button.title = playing
+      ? 'Stop weather radar playback'
+      : 'Play recent weather radar history';
+    return Boolean(api);
+  }
+
+  async function togglePlayback() {
+    const api = radarApi();
+    if (!api || actionRunning) return;
+
+    actionRunning = true;
+    updateButton();
+
+    try {
+      if (api.playbackRunning) {
+        api.pause();
+        return;
+      }
+
+      if (!api.enabled) {
+        const enabled = await api.enable();
+        if (!enabled) return;
+      }
+
+      if (!api.frameCount) {
+        const loaded = await api.refresh();
+        if (!loaded) return;
+      }
+
+      api.play();
+    } catch (error) {
+      try {
+        if (typeof setMessage === 'function') {
+          setMessage(
+            'mapMessage',
+            `Radar playback failed: ${error.message || error}`,
+            'error'
+          );
+        }
+      } catch (_) {}
+    } finally {
+      actionRunning = false;
+      updateButton();
+    }
+  }
+
+  function install() {
+    const button = buttonNode();
+    if (!button) return false;
+
+    if (!clickBound) {
+      button.addEventListener('click', togglePlayback);
+      clickBound = true;
+    }
+
+    updateButton();
+    return true;
+  }
+
+  function boot() {
+    let attempts = 0;
+    const installTimer = window.setInterval(() => {
+      attempts += 1;
+      if ((install() && radarApi()) || attempts >= 160) {
+        window.clearInterval(installTimer);
+      }
+    }, 250);
+
+    install();
+    window.setInterval(updateButton, 250);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+/* RTP_MAP_RADAR_PLAYBACK_TOGGLE_V1_END */
 
 /* ACTIVE_TRAIL_CLEANUP_V2_START */
 (function(){
