@@ -47,11 +47,18 @@ DEFAULT_RECEIVER_LOCATION = {
     "label": "Cripple Creek receiver",
     "source": "initial_development_default",
 }
+# NOAA_162500_VALIDATED_PROFILE_V1:
+# Two independent listening captures validated this receiver profile.
+# The RF input rate is separate from the 24 kHz browser/WAV audio rate.
 NOAA_PROFILE = {
     "frequency_hz": 162500000,
     "modulation": "nfm",
+    "input_sample_rate_hz": 240000,
     "sample_rate_hz": 24000,
-    "gain_db": 40.2,
+    "gain_db": 49.6,
+    "ppm": 0,
+    "offset_tuning": True,
+    "dc_block": True,
     "deemphasis": True,
 }
 AIRBAND_LIVE_AUDIO_PROFILE = {
@@ -451,16 +458,26 @@ class AudioManager:
             self.runtime_dir.mkdir(parents=True, exist_ok=True)
             live_log_path = self.runtime_dir / "latest_live_audio_rtl_fm.log"
             live_log_path.unlink(missing_ok=True)
+            input_sample_rate_hz = int(
+                profile.get("input_sample_rate_hz", profile["sample_rate_hz"])
+            )
+            output_sample_rate_hz = int(profile["sample_rate_hz"])
             command = [
                 windows_path(Path(rtl_fm)),
                 "-d", AUDIO_SERIAL,
                 "-f", str(profile["frequency_hz"]),
                 "-M", str(profile["rtl_fm_mode"]),
-                "-s", str(profile["sample_rate_hz"]),
-                "-r", str(profile["sample_rate_hz"]),
+                "-s", str(input_sample_rate_hz),
+                "-r", str(output_sample_rate_hz),
                 "-g", str(profile["gain_db"]),
                 "-l", "0",
             ]
+            if profile.get("ppm") is not None:
+                command.extend(["-p", str(int(profile["ppm"]))])
+            if profile.get("offset_tuning"):
+                command.extend(["-E", "offset"])
+            if profile.get("dc_block"):
+                command.extend(["-E", "dc"])
             if profile.get("deemphasis"):
                 command.extend(["-E", "deemp"])
             self.live_log_handle = live_log_path.open("wb")
@@ -591,10 +608,13 @@ class AudioManager:
                 "-d", AUDIO_SERIAL,
                 "-f", str(NOAA_PROFILE["frequency_hz"]),
                 "-M", "fm",
-                "-s", str(NOAA_PROFILE["sample_rate_hz"]),
+                "-s", str(NOAA_PROFILE["input_sample_rate_hz"]),
                 "-r", str(NOAA_PROFILE["sample_rate_hz"]),
                 "-g", str(NOAA_PROFILE["gain_db"]),
                 "-l", "0",
+                "-p", str(int(NOAA_PROFILE["ppm"])),
+                "-E", "offset",
+                "-E", "dc",
                 "-E", "deemp",
                 windows_path(self.raw_path),
             ]

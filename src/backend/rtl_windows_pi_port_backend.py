@@ -58,10 +58,9 @@ from rtl_windows_backend import (
 )
 
 LOG = logging.getLogger("rtl_windows_pi_port_backend")
-NOAA_FREQUENCIES = [
-    162400000, 162425000, 162450000, 162475000,
-    162500000, 162525000, 162550000,
-]
+# NOAA_162500_VALIDATED_PROFILE_V1:
+# Only 162.500 MHz is valid at this installed receiver location.
+NOAA_FREQUENCIES = [162500000]
 DEFAULT_RADIUS_MILES = 100.0
 DEFAULT_AIRBAND_ACTIVITY_RMS = 1300.0
 DEFAULT_AIRBAND_RF_GAIN_DB = float(AIRBAND_LIVE_AUDIO_PROFILE.get("gain_db", 40.2))
@@ -202,14 +201,24 @@ class PiPortSettingsStore(SettingsStore):
                         int(value) for value in blocked if int(value) > 0
                     })
                 selection = loaded.get("noaa_selection")
-                if isinstance(selection, dict) and int(selection.get("frequency_hz", 0)) in NOAA_FREQUENCIES:
-                    self.noaa_frequency_hz = int(selection["frequency_hz"])
-                    self.noaa_station = str(selection.get("station") or self.noaa_station)
+                if (
+                    isinstance(selection, dict)
+                    and int(selection.get("frequency_hz", 0)) == int(NOAA_PROFILE["frequency_hz"])
+                ):
+                    self.noaa_frequency_hz = int(NOAA_PROFILE["frequency_hz"])
+                    self.noaa_station = str(
+                        selection.get("station") or "Fixed local NOAA — 162.500 MHz"
+                    )
                     self.noaa_selection_location_key = (
                         str(selection.get("receiver_location_key") or "").strip() or None
                     )
             except Exception as exc:
                 LOG.warning("Unable to read Pi-port extended settings: %s", exc)
+        # Discard any previously saved adjacent-channel result.
+        self.noaa_frequency_hz = int(NOAA_PROFILE["frequency_hz"])
+        self.noaa_station = "Fixed local NOAA — 162.500 MHz"
+        if not self.noaa_selection_location_key:
+            self.noaa_selection_location_key = self.noaa_location_key()
 
     @staticmethod
     def _validate_radius(value: Any) -> float:
@@ -390,15 +399,20 @@ class PiPortSettingsStore(SettingsStore):
         return self.airband_tuning()
 
     def save_noaa_selection(self, frequency_hz: int, station: str) -> None:
-        self.noaa_frequency_hz = int(frequency_hz)
-        self.noaa_station = str(station)
+        fixed_frequency_hz = int(NOAA_PROFILE["frequency_hz"])
+        if int(frequency_hz) != fixed_frequency_hz:
+            raise ValueError(
+                f"This receiver location is locked to {fixed_frequency_hz / 1_000_000:.3f} MHz NOAA."
+            )
+        self.noaa_frequency_hz = fixed_frequency_hz
+        self.noaa_station = "Fixed local NOAA — 162.500 MHz"
         self.noaa_selection_location_key = self.noaa_location_key()
         self._persist_port_settings()
 
     def reset_noaa_selection(self) -> None:
         self.noaa_frequency_hz = int(NOAA_PROFILE["frequency_hz"])
-        self.noaa_station = "Selection cleared — awaiting Fast NOAA scan"
-        self.noaa_selection_location_key = None
+        self.noaa_station = "Fixed local NOAA — 162.500 MHz"
+        self.noaa_selection_location_key = self.noaa_location_key()
         self._persist_port_settings()
 
 
@@ -2260,13 +2274,14 @@ class PiPortHandler(BaseHTTPRequestHandler):
             "audio_receiver_serial": AUDIO_SERIAL,
             "noaa_station": self.settings.noaa_station,
             "noaa_frequency_hz": self.settings.noaa_frequency_hz,
-            "configured_noaa_station": "Validated local NOAA channel",
+            "configured_noaa_station": "Fixed local NOAA channel",
             "configured_noaa_frequency_hz": int(NOAA_PROFILE["frequency_hz"]),
             "saved_noaa_selection_available": True,
             "saved_noaa_frequency_hz": self.settings.noaa_frequency_hz,
             "saved_noaa_station": self.settings.noaa_station,
             "saved_noaa_selection_current_location": self.settings.can_reuse_noaa_selection(),
-            "noaa_start_policy": "reuse_saved_verified_channel_until_location_change_or_manual_rescan",
+            "noaa_start_policy": "fixed_162_500_mhz_validated_local_profile",
+            "noaa_profile": dict(NOAA_PROFILE),
             "rf_gain_db": NOAA_PROFILE["gain_db"],
             "audio_output_gain": None,
             "receiver_location_configured": True,
