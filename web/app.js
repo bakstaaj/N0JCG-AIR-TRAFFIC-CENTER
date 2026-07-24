@@ -1590,7 +1590,9 @@ async function updateAircraft() {
       setMessage('trafficSourceMessage', `Unified aircraft feed: 1090 ${enabled.adsb_1090 ? 'on' : 'off'} (${adsbCount}) · UAT ${enabled.uat_978 ? 'on' : 'off'} (${uatCount})`, (enabled.adsb_1090 || enabled.uat_978) ? 'good' : 'warning');
     }
     updateAircraftMap(activeAircraft);
-    const visibleAircraft = activeAircraft.slice(0, 20);
+    // ACTIVE_AIRCRAFT_LIST_ALL_RECORDS_V1:
+    // Keep the scrollable list synchronized with every active map marker.
+    const visibleAircraft = activeAircraft;
     body.replaceChildren();
     if (!visibleAircraft.length) {
       body.innerHTML = '<tr><td colspan="4" class="empty">No current aircraft records.</td></tr>';
