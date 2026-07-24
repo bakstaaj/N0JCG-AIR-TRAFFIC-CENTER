@@ -2709,5 +2709,190 @@ def main() -> int:
     return 0
 
 
+
+# UAT_STATUS_CONSISTENCY_V1:
+# Normalize the public UAT status contract after all legacy UAT managers and
+# compatibility wrappers have populated their fields.
+#
+# Public meanings:
+#   configured          Receiver hardware/decoder path is available.
+#   selected / enabled  User selected the UAT traffic source.
+#   running             dump978-fa is actually running.
+#   persistent_enabled  Saved traffic-source selection.
+#
+# The old persistent_enabled value represented a decoder-autostart concept in
+# some legacy status producers. Preserve it as decoder_autostart_enabled rather
+# than reporting it as the user's saved traffic-source state.
+def _normalize_uat_status_payload(payload: Any) -> Any:
+    if not isinstance(payload, dict):
+        return payload
+
+    has_uat_status = any(
+        key in payload
+        for key in ("uat_978", "uat_978_enabled", "traffic_sources", "receiver_roles")
+    )
+    if not has_uat_status:
+        return payload
+
+    normalized = dict(payload)
+
+    traffic_value = normalized.get("traffic_sources")
+    if isinstance(traffic_value, dict):
+        traffic = dict(traffic_value)
+        traffic_is_nested = True
+    elif any(key in normalized for key in ("uat_978", "uat_978_enabled", "adsb_1090_enabled")):
+        traffic = dict(normalized)
+        traffic_is_nested = False
+    else:
+        traffic = {}
+        traffic_is_nested = True
+
+    top_uat = normalized.get("uat_978")
+    traffic_uat = traffic.get("uat_978") if isinstance(traffic, dict) else None
+
+    uat: dict[str, Any] = {}
+    if isinstance(top_uat, dict):
+        uat.update(top_uat)
+    if isinstance(traffic_uat, dict):
+        for key, value in traffic_uat.items():
+            uat.setdefault(key, value)
+
+    selected_value: Any = None
+    for candidate in (
+        traffic.get("uat_978_enabled") if isinstance(traffic, dict) else None,
+        normalized.get("uat_978_enabled"),
+        traffic_uat.get("selected") if isinstance(traffic_uat, dict) else None,
+        traffic_uat.get("enabled") if isinstance(traffic_uat, dict) else None,
+        uat.get("selected"),
+        uat.get("enabled"),
+    ):
+        if candidate is not None:
+            selected_value = candidate
+            break
+
+    running = bool(uat.get("running", False))
+    selected = bool(running if selected_value is None else selected_value)
+
+    roles_value = normalized.get("receiver_roles")
+    roles = dict(roles_value) if isinstance(roles_value, dict) else {}
+    role_value = roles.get("uat")
+    role = dict(role_value) if isinstance(role_value, dict) else {}
+
+    expected_serials = roles.get("expected_serials")
+    expected_uat_serial = (
+        expected_serials.get("uat_978")
+        if isinstance(expected_serials, dict)
+        else None
+    )
+    serial = str(
+        uat.get("serial")
+        or role.get("serial")
+        or expected_uat_serial
+        or ""
+    ).strip()
+
+    available_source = uat.get("available")
+    available = bool(
+        available_source
+        if available_source is not None
+        else (serial or role.get("index") is not None)
+    )
+
+    legacy_autostart = uat.get("decoder_autostart_enabled")
+    if legacy_autostart is None and isinstance(traffic_uat, dict):
+        legacy_autostart = traffic_uat.get("decoder_autostart_enabled")
+    if legacy_autostart is None:
+        legacy_autostart = uat.get("persistent_enabled")
+    if legacy_autostart is None and isinstance(traffic_uat, dict):
+        legacy_autostart = traffic_uat.get("persistent_enabled")
+
+    configured = bool(available and serial)
+    state = (
+        "running"
+        if running
+        else (
+            "selected_stopped"
+            if selected
+            else ("available_disabled" if available else "unavailable")
+        )
+    )
+
+    uat.update({
+        "configured": configured,
+        "selected": selected,
+        "enabled": selected,
+        "running": running,
+        "persistent_enabled": selected,
+        "state": state,
+    })
+    if legacy_autostart is not None:
+        uat["decoder_autostart_enabled"] = bool(legacy_autostart)
+
+    if isinstance(traffic, dict):
+        traffic_copy = dict(traffic)
+        traffic_copy["uat_978_enabled"] = selected
+
+        nested_uat = dict(traffic_uat) if isinstance(traffic_uat, dict) else {}
+        nested_uat.update(uat)
+        nested_uat["configured"] = configured
+        nested_uat["selected"] = selected
+        nested_uat["enabled"] = selected
+        nested_uat["running"] = running
+        nested_uat["persistent_enabled"] = selected
+        nested_uat["state"] = state
+        traffic_copy["uat_978"] = nested_uat
+
+        if traffic_is_nested:
+            normalized["traffic_sources"] = traffic_copy
+        else:
+            normalized.update(traffic_copy)
+
+    normalized["uat_978"] = dict(uat)
+    normalized["uat_978_enabled"] = selected
+
+    role.update({
+        "configured": configured,
+        "selected": selected,
+        "enabled": selected,
+        "running": running,
+        "available": available,
+    })
+    if serial:
+        role["serial"] = serial
+    roles["uat"] = role
+    normalized["receiver_roles"] = roles
+
+    return normalized
+
+
+_rtp_uat_status_base_port_status = PiPortHandler.port_status
+
+
+def _rtp_uat_status_consistent_port_status(self: PiPortHandler) -> dict[str, Any]:
+    return _normalize_uat_status_payload(
+        _rtp_uat_status_base_port_status(self)
+    )
+
+
+PiPortHandler.port_status = _rtp_uat_status_consistent_port_status  # type: ignore[method-assign]
+
+
+_rtp_uat_status_base_send_json = PiPortHandler.send_json
+
+
+def _rtp_uat_status_consistent_send_json(
+    self: PiPortHandler,
+    payload: Any,
+    code: int = HTTPStatus.OK,
+) -> None:
+    _rtp_uat_status_base_send_json(
+        self,
+        _normalize_uat_status_payload(payload),
+        code,
+    )
+
+
+PiPortHandler.send_json = _rtp_uat_status_consistent_send_json  # type: ignore[method-assign]
+
 if __name__ == "__main__":
     raise SystemExit(main())
