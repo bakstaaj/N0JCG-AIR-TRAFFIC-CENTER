@@ -349,6 +349,7 @@ class PiPortSettingsStore(SettingsStore):
             "airband_playback_squelch_rms": self.airband_playback_squelch_rms,
             "airband_fast_range_hz": [FAST_AIRBAND_LOW_HZ, FAST_AIRBAND_HIGH_HZ],
             "airband_blocked_frequencies_hz": list(self.airband_blocked_frequencies_hz),
+            "airband_audio_profile": dict(AIRBAND_LIVE_AUDIO_PROFILE),
         }
 
     def save_airband_tuning(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -2336,6 +2337,8 @@ class PiPortHandler(BaseHTTPRequestHandler):
             "saved_noaa_selection_current_location": self.settings.can_reuse_noaa_selection(),
             "noaa_start_policy": "reuse_saved_verified_channel_until_location_change_or_manual_rescan",
             "noaa_profile": dict(NOAA_PROFILE),
+            "airband_audio_profile": dict(AIRBAND_LIVE_AUDIO_PROFILE),
+            "airband_rf_gain_db": self.settings.airband_rf_gain_db,
             "rf_gain_db": NOAA_PROFILE["gain_db"],
             "audio_output_gain": None,
             "receiver_location_configured": True,

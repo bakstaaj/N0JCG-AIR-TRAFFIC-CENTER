@@ -61,10 +61,17 @@ NOAA_PROFILE = {
     "dc_block": True,
     "deemphasis": True,
 }
+# AIRBAND_VALIDATED_RECEIVER_PROFILE_V1:
+# Apply the receiver settings validated through repeated clear NOAA captures.
+# Deemphasis remains disabled because Airband voice uses AM.
 AIRBAND_LIVE_AUDIO_PROFILE = {
     "modulation": "am",
+    "input_sample_rate_hz": 240000,
     "sample_rate_hz": 24000,
-    "gain_db": 40.2,
+    "gain_db": 49.6,
+    "ppm": 0,
+    "offset_tuning": True,
+    "dc_block": True,
     "deemphasis": False,
 }
 
