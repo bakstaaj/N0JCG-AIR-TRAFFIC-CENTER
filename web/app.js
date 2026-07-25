@@ -3519,8 +3519,12 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
     return null;
   }
 
+  // WEATHER_RADAR_AUTOPLAY_DEFAULT_V1:
+  // New browsers start with radar enabled. An explicit Show Radar off setting
+  // remains respected. Pause is session-only, so reload starts playback again.
   function radarEnabled() {
-    return localStorage.getItem(ENABLED_KEY) === '1';
+    const stored = localStorage.getItem(ENABLED_KEY);
+    return stored == null ? true : stored === '1';
   }
 
   function currentOpacity() {
@@ -3695,7 +3699,11 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   }
 
   function startPlayback() {
-    if (!radarEnabled() || radarFrames.length < 2) return;
+    if (!radarEnabled() || radarFrames.length < 2 || playbackRunning) return;
+    if (playbackTimer) {
+      window.clearTimeout(playbackTimer);
+      playbackTimer = null;
+    }
     if (currentFrameIndex >= radarFrames.length - 1) showFrame(0, false);
     playbackRunning = true;
     updateControls();
@@ -3831,8 +3839,11 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
 
     showFrame(currentFrameIndex >= 0 ? currentFrameIndex : radarFrames.length - 1, false);
     startRefreshTimer();
-    updateControls();
-    if (announce) setRadarStatus('Weather radar overlay enabled on the latest frame.', 'good');
+    if (radarFrames.length >= 2) startPlayback();
+    else updateControls();
+    if (announce && !playbackRunning) {
+      setRadarStatus('Weather radar overlay enabled on the latest frame.', 'good');
+    }
     return true;
   }
 
@@ -3973,13 +3984,13 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
     const api = radarApi();
     const playing = Boolean(api && api.playbackRunning);
 
-    button.textContent = playing ? 'Stop Radar' : 'Play Radar';
+    button.textContent = playing ? 'Pause Radar' : 'Play Radar';
     button.classList.toggle('stop', playing);
     button.disabled = actionRunning || !api;
     button.setAttribute('aria-pressed', playing ? 'true' : 'false');
     button.title = playing
-      ? 'Stop weather radar playback'
-      : 'Play recent weather radar history';
+      ? 'Pause weather radar playback'
+      : 'Resume recent weather radar history';
     return Boolean(api);
   }
 
