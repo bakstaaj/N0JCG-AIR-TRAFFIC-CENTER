@@ -3507,6 +3507,9 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   let playbackRunning = false;
   let loadingFrames = false;
   let controlsBound = false;
+  // WEATHER_RADAR_REFRESH_AUTOPLAY_RACE_V3:
+  // Prevent boot() and its retry timer from starting concurrent frame loads.
+  let startupTriggered = false;
 
   function byId(id) {
     try { return document.getElementById(id); } catch (_) { return null; }
@@ -3913,10 +3916,17 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   function install() {
     if (!mapInstance()) return false;
     bindControls();
-    updateControls();
 
-    if (radarEnabled()) setEnabled(true, false);
-    else setRadarStatus('Radar is off. Enable it to load recent radar frames.', '');
+    if (!startupTriggered) {
+      startupTriggered = true;
+      // Radar animation is the page-refresh default. Turning Show Radar off
+      // remains effective for the current page; a reload starts it again.
+      localStorage.setItem(ENABLED_KEY, '1');
+      updateControls();
+      void setEnabled(true, false);
+    } else {
+      updateControls();
+    }
 
     window.__rtpWeatherRadarHistoryMenuV1 = {
       installed: true,
@@ -3935,12 +3945,15 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   }
 
   function boot() {
+    // Try synchronously first. Only create a retry timer when the map is not
+    // ready yet; never leave a second install pending after startup begins.
+    if (install()) return;
+
     let attempts = 0;
     const timer = window.setInterval(() => {
       attempts += 1;
       if (install() || attempts >= 120) window.clearInterval(timer);
     }, 250);
-    install();
   }
 
   window.addEventListener('storage', event => {
