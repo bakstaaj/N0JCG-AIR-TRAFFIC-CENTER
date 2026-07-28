@@ -3495,7 +3495,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   const DEFAULT_OPACITY = 45;
   const DEFAULT_HISTORY_MINUTES = 60;
   const DEFAULT_SPEED_MS = 900;
-  const NEWEST_FRAME_HOLD_MS = 1800;
+  const NEWEST_FRAME_HOLD_MS = 15000;
   const MAX_NATIVE_ZOOM = 7;
 
   let radarHost = '';
