@@ -3485,7 +3485,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   const ENABLED_KEY = 'rtlAdsbWeatherRadarEnabledV1';
   const OPACITY_KEY = 'rtlAdsbWeatherRadarOpacityV1';
   const HISTORY_KEY = 'rtlAdsbWeatherRadarHistoryMinutesV1';
-  const SPEED_KEY = 'rtlAdsbWeatherRadarPlaybackSpeedV2';
+  const SPEED_KEY = 'rtlAdsbWeatherRadarPlaybackSpeedV3';
   const LOOP_KEY = 'rtlAdsbWeatherRadarLoopV1';
 
   const WEATHER_MAPS_URL = 'https://api.rainviewer.com/public/weather-maps.json';
@@ -3494,13 +3494,15 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   const MAX_OPACITY = 85;
   const DEFAULT_OPACITY = 45;
   const DEFAULT_HISTORY_MINUTES = 60;
-  const DEFAULT_SPEED_MS = 550;
+  const DEFAULT_SPEED_MS = 1500;
   const NEWEST_FRAME_HOLD_MS = 15000;
   const MAX_NATIVE_ZOOM = 7;
 
   let radarHost = '';
   let radarFrames = [];
   let radarLayer = null;
+  let pendingRadarLayer = null;
+  let radarTransitionId = 0;
   let currentFrameIndex = -1;
   let refreshTimer = null;
   let playbackTimer = null;
@@ -3543,7 +3545,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
 
   function playbackSpeedMs() {
     const stored = Number(localStorage.getItem(SPEED_KEY) || DEFAULT_SPEED_MS);
-    return [300, 550, 900].includes(stored) ? stored : DEFAULT_SPEED_MS;
+    return [900, 1500, 2200].includes(stored) ? stored : DEFAULT_SPEED_MS;
   }
 
   function playbackLoops() {
@@ -3662,20 +3664,79 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
     if (announce) setRadarStatus('Radar playback paused.', '');
   }
 
+  // WEATHER_RADAR_BUFFERED_TRANSITIONS_V1:
+  // Keep the displayed layer visible until every tile in the replacement
+  // layer has loaded. The playback timer starts only after the swap.
   function showFrame(index, announce) {
-    if (!radarFrames.length) return false;
-    currentFrameIndex = Math.max(0, Math.min(radarFrames.length - 1, Number(index) || 0));
-    const layer = ensureRadarLayer();
-    const frame = radarFrames[currentFrameIndex];
-    if (!layer || !frame) return false;
+    if (!radarFrames.length) return Promise.resolve(false);
+    const targetIndex = Math.max(0, Math.min(radarFrames.length - 1, Number(index) || 0));
+    const frame = radarFrames[targetIndex];
+    const map = mapInstance();
+    if (!map || typeof L === 'undefined' || !L.tileLayer || !frame) {
+      return Promise.resolve(false);
+    }
 
-    try { layer.setUrl(frameTileUrl(frame), false); } catch (_) {}
-    try { layer.setOpacity(currentOpacity() / 100); } catch (_) {}
-    try { layer.redraw(); } catch (_) {}
+    const transitionId = ++radarTransitionId;
+    if (pendingRadarLayer) {
+      try { if (map.hasLayer(pendingRadarLayer)) map.removeLayer(pendingRadarLayer); } catch (_) {}
+      pendingRadarLayer = null;
+    }
 
-    updateControls();
-    if (announce) setRadarStatus(`Showing radar frame ${relativeFrameText(currentFrameIndex)}.`, 'good');
-    return true;
+    const previousLayer = radarLayer;
+    const targetOpacity = currentOpacity() / 100;
+    const nextLayer = L.tileLayer(frameTileUrl(frame), {
+      pane: ensureRadarPane(map),
+      opacity: previousLayer ? 0 : targetOpacity,
+      maxNativeZoom: MAX_NATIVE_ZOOM,
+      maxZoom: 19,
+      updateWhenIdle: false,
+      keepBuffer: 2,
+      crossOrigin: true,
+      attribution: 'Radar: RainViewer'
+    });
+    pendingRadarLayer = nextLayer;
+
+    return new Promise(resolve => {
+      let settled = false;
+      let fallbackTimer = null;
+
+      const finishTransition = () => {
+        if (settled) return;
+        settled = true;
+        if (fallbackTimer) window.clearTimeout(fallbackTimer);
+
+        if (transitionId !== radarTransitionId) {
+          try { if (map.hasLayer(nextLayer)) map.removeLayer(nextLayer); } catch (_) {}
+          resolve(false);
+          return;
+        }
+
+        try { nextLayer.setOpacity(targetOpacity); } catch (_) {}
+        if (previousLayer && previousLayer !== nextLayer) {
+          try { if (map.hasLayer(previousLayer)) map.removeLayer(previousLayer); } catch (_) {}
+        }
+        radarLayer = nextLayer;
+        pendingRadarLayer = null;
+        currentFrameIndex = targetIndex;
+        updateControls();
+        if (announce) {
+          setRadarStatus(`Showing radar frame ${relativeFrameText(currentFrameIndex)}.`, 'good');
+        }
+        resolve(true);
+      };
+
+      try {
+        nextLayer.once('load', finishTransition);
+        nextLayer.addTo(map);
+      } catch (_) {
+        if (pendingRadarLayer === nextLayer) pendingRadarLayer = null;
+        resolve(false);
+        return;
+      }
+
+      // A provider or network error must not freeze playback indefinitely.
+      fallbackTimer = window.setTimeout(finishTransition, 6000);
+    });
   }
 
   function schedulePlaybackStep() {
@@ -3696,8 +3757,9 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
         next = 0;
       }
 
-      showFrame(next, false);
-      schedulePlaybackStep();
+      void showFrame(next, false).then(() => {
+        if (playbackRunning) schedulePlaybackStep();
+      });
     }, newest ? NEWEST_FRAME_HOLD_MS : playbackSpeedMs());
   }
 
@@ -3707,14 +3769,20 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
       window.clearTimeout(playbackTimer);
       playbackTimer = null;
     }
-    if (currentFrameIndex >= radarFrames.length - 1) showFrame(0, false);
+    const restartAtOldest = currentFrameIndex >= radarFrames.length - 1;
     playbackRunning = true;
     updateControls();
     setRadarStatus(
       `Playing ${historyMinutes()} minutes of radar history. ${radarFrames.length} frames loaded.`,
       'good'
     );
-    schedulePlaybackStep();
+    if (restartAtOldest) {
+      void showFrame(0, false).then(() => {
+        if (playbackRunning) schedulePlaybackStep();
+      });
+    } else {
+      schedulePlaybackStep();
+    }
   }
 
   function selectedFrameTime() {
@@ -3822,9 +3890,12 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
       stopPlayback(false);
       stopRefreshTimer();
       const map = mapInstance();
+      radarTransitionId += 1;
       try {
+        if (map && pendingRadarLayer && map.hasLayer(pendingRadarLayer)) map.removeLayer(pendingRadarLayer);
         if (map && radarLayer && map.hasLayer(radarLayer)) map.removeLayer(radarLayer);
       } catch (_) {}
+      pendingRadarLayer = null;
       updateControls();
       if (announce) setRadarStatus('Weather radar overlay disabled.', '');
       return true;
@@ -3891,7 +3962,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
     if (history) history.addEventListener('change', () => setHistory(history.value));
     if (speed) speed.addEventListener('change', () => {
       const parsed = Number(speed.value);
-      localStorage.setItem(SPEED_KEY, String([550, 900, 1400].includes(parsed) ? parsed : DEFAULT_SPEED_MS));
+      localStorage.setItem(SPEED_KEY, String([900, 1500, 2200].includes(parsed) ? parsed : DEFAULT_SPEED_MS));
       if (playbackRunning) {
         if (playbackTimer) window.clearTimeout(playbackTimer);
         playbackTimer = null;
