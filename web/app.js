@@ -396,7 +396,11 @@ function initializeAircraftMap() {
     setMessage('mapMessage', 'Map library could not load. The browser workstation must have internet access for Leaflet and map tiles.', 'error');
     return;
   }
-  aircraftMap = L.map('aircraftMap').setView([29.7604, -95.3698], 9);
+  // LEAFLET_GLOBAL_NO_TILE_FADE_V1:
+  // Disable Leaflet's JavaScript opacity ramp before any tile layer exists.
+  aircraftMap = L.map('aircraftMap', {
+    fadeAnimation: false
+  }).setView([29.7604, -95.3698], 9);
 
   aircraftMap.on('click', finishReceiverLocationPick);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
