@@ -444,3 +444,10 @@ body.map-popout-window .leaflet-container {
   min-width: 86px;
 }
 /* RTP_MAP_RADAR_PLAYBACK_TOGGLE_V1_END */
+
+/* WEATHER_RADAR_NO_TILE_FADE_V1_START */
+.weather-radar-no-fade .leaflet-tile {
+  transition: none !important;
+  animation: none !important;
+}
+/* WEATHER_RADAR_NO_TILE_FADE_V1_END */

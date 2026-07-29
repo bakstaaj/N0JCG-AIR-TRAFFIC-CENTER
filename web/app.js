@@ -3567,6 +3567,18 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
 
   function ensureRadarPane(map) {
     if (!map || typeof map.createPane !== 'function') return 'tilePane';
+
+    // WEATHER_RADAR_NO_TILE_FADE_V1:
+    // Leaflet's fade animation makes a fully buffered radar frame appear pale
+    // before reaching the requested opacity. Disable that map-level tile fade
+    // so the ready layer swaps in immediately at its configured opacity.
+    try {
+      map.options.fadeAnimation = false;
+      map._fadeAnimated = false;
+      const container = typeof map.getContainer === 'function' ? map.getContainer() : null;
+      if (container && container.classList) container.classList.remove('leaflet-fade-anim');
+    } catch (_) {}
+
     let pane = null;
     try { pane = map.getPane('weatherRadarPane'); } catch (_) {}
     if (!pane) {
@@ -3574,6 +3586,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
       pane.style.zIndex = '300';
       pane.style.pointerEvents = 'none';
     }
+    try { pane.classList.add('weather-radar-no-fade'); } catch (_) {}
     return 'weatherRadarPane';
   }
 
