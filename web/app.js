@@ -3265,7 +3265,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `RTL-ADS-B-Tracker_NOAA_Browser_Trace_${at().replace(/[:.]/g, '-')}.json`;
+      a.download = `N0JCG_AIR_TRAFFIC_CENTER_NOAA_Browser_Trace_${at().replace(/[:.]/g, '-')}.json`;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
@@ -4432,7 +4432,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   function applyMapPopoutMode() {
     if (!isMapPopoutWindow()) return;
     document.body.classList.add('map-popout-window');
-    try { document.title = 'RTL ADS-B Tracker — Map'; } catch (_) {}
+    try { document.title = 'N0JCG AIR TRAFFIC CENTER — Map'; } catch (_) {}
     invalidateAircraftMapSoon();
   }
 

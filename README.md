@@ -1,10 +1,33 @@
-# PI-AIR-TRAFFIC-TRACKER
+# N0JCG AIR TRAFFIC CENTER
 
-Raspberry Pi 5 aircraft tracking and aviation audio application.
+N0JCG AIR TRAFFIC CENTER is a Raspberry Pi 5 aircraft tracking and aviation audio application.
 
-This repository is the Raspberry Pi port of `bakstaaj/RTL-WINDOWS-ADS-B-TRACKER`, adapted for a Pi-native Linux runtime while preserving the Windows tracker UI and user-facing behavior.
+The compatibility repository remains `PI-AIR-TRAFFIC-TRACKER`. It is the Raspberry Pi port of `bakstaaj/RTL-WINDOWS-ADS-B-TRACKER`, adapted for a Pi-native Linux runtime.
 
-## V0.1 initial Pi port status
+<!-- V1_0_RELEASE_BEGIN -->
+## v1.0.0 production release
+
+N0JCG AIR TRAFFIC CENTER v1.0.0 is the first full production release of the Raspberry Pi 5 aviation receiver application.
+
+| Production area | Status |
+| --- | --- |
+| Raspberry Pi 5 / Debian Trixie service | PASS |
+| FlyCatcher ADS-B 1090 reception | PASS |
+| Optional FlyCatcher UAT 978 source integration | PASS |
+| Seven-channel NOAA RF-first selection | PASS |
+| NOAA clear live browser audio | PASS |
+| Airband Fast Spectrum scanner | PASS |
+| Airband validated AM receiver profile | PASS |
+| Concurrent RTL-SDR USBFS provisioning | PASS |
+| Aircraft map, trails, history, and weather radar | PASS |
+| Release hardware acceptance suite | PASS |
+
+Validated NOAA and Airband receiver settings use a 240 kHz RF input rate, 24 kHz audio, 49.6 dB RF gain, 0 PPM correction, offset tuning, and DC removal. NOAA adds FM deemphasis; Airband AM deliberately does not.
+
+See [`docs/RELEASE_V1_0_0.md`](docs/RELEASE_V1_0_0.md) for the complete release scope and acceptance baseline.
+<!-- V1_0_RELEASE_END -->
+
+## Historical V0.1 initial Pi port checkpoint
 
 The V0.1 checkpoint has validated the initial Raspberry Pi 5 + Nooelec FlyCatcher/NESDR runtime path:
 
@@ -49,10 +72,10 @@ The default browser URL is:
 http://<pi-lan-ip>:8090
 ```
 
-For the current bench Pi address used during validation:
+For the v1.0.0 hardware acceptance Pi used during release validation:
 
 ```text
-http://192.168.254.63:8090
+http://192.168.68.137:8090
 ```
 
 ## Fresh Pi setup flow
@@ -105,6 +128,8 @@ The repo workflow is script-first:
 See `docs/DEV_GUARDRAILS.md` for project workflow rules.
 
 ## Key documents
+
+- `docs/RELEASE_V1_0_0.md`
 
 - `docs/RELEASE_V0_1_INITIAL_PI_PORT.md`
 - `docs/PI_INITIAL_PORT_VALIDATION_CHECKLIST.md`
