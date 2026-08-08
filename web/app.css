@@ -464,6 +464,20 @@ input, select { background: #0d223f; border-color: var(--n0-border); color: var(
 }
 .menu-guide-link:hover,
 .menu-guide-link:focus-visible { color: #7be7f5; text-decoration: underline; }
+.pdf-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 25px;
+  height: 17px;
+  padding: 0 3px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  line-height: 1;
+}
 
 table th { border-bottom-color: var(--n0-border); }
 table td { border-bottom-color: rgba(199, 205, 212, .16); }

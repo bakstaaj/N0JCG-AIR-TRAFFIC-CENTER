@@ -395,7 +395,7 @@ http://<pi-lan-ip>:8090
 For the validated installation used during development:
 
 ```text
-http://192.168.68.137:8090
+http://192.168.68.110:8090
 ```
 
 If the Pi address changes, use its current LAN address. The port remains `8090` unless the systemd configuration is intentionally changed.

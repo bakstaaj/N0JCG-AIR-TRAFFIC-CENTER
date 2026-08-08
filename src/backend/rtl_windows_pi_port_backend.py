@@ -2350,7 +2350,7 @@ class PiPortHandler(BaseHTTPRequestHandler):
         try:
             request = urlparse(self.path)
 
-            if request.path in ("/app.css", "/app.js"):
+            if request.path in ("/app.css", "/app.js") or request.path.startswith("/assets/"):
                 asset_name = request.path.lstrip("/")
                 asset_candidates = []
                 try:
@@ -2372,7 +2372,9 @@ class PiPortHandler(BaseHTTPRequestHandler):
                     self.send_json({"error": f"Static asset not found: {asset_name}"}, HTTPStatus.NOT_FOUND)
                     return
                 body = asset_path.read_bytes()
-                content_type = "text/css; charset=utf-8" if asset_name.endswith(".css") else "application/javascript; charset=utf-8"
+                content_type = mimetypes.guess_type(asset_name)[0] or "application/octet-stream"
+                if content_type.startswith("text/") or content_type in {"application/javascript", "application/json"}:
+                    content_type += "; charset=utf-8"
                 self.send_response(HTTPStatus.OK)
                 self.send_header("Content-Type", content_type)
                 self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")

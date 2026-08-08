@@ -13,7 +13,7 @@
 <body>
 <header class="app-header">
   <button id="menuToggle" class="menu-button" type="button" aria-label="Open menu" aria-expanded="false">&#9776;</button>
-  <a class="return-button" href="http://192.168.68.114:8095/" aria-label="Return to ROC dashboard" title="Return to ROC dashboard">
+  <a id="returnButton" class="return-button" href="#" aria-label="Return to previous application" title="Return to previous application">
     <svg class="return-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
       <path d="M20 18v-2a7 7 0 0 0-7-7H5m4-4-4 4 4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
     </svg>
@@ -48,7 +48,7 @@
     <details id="userGuideDetails">
       <summary>User Guide</summary>
       <div class="menu-group">
-        <a class="menu-guide-link" href="assets/user-guide/N0JCG_Air_Traffic_Center_User_Guide_v1.0.pdf" target="_blank" rel="noopener noreferrer">Open branded PDF guide <span aria-hidden="true">↗</span></a>
+        <a class="menu-guide-link" href="assets/user-guide/N0JCG_Air_Traffic_Center_User_Guide_v1.0.pdf" target="_blank" rel="noopener noreferrer"><span class="pdf-icon" aria-hidden="true">PDF</span><span>View User Guide (PDF)</span><span aria-hidden="true">↗</span></a>
         <p class="menu-help">End-user procedures, screenshots, receiver boundaries, and recovery guidance for N0JCG Air Traffic Center v1.0.0.</p>
       </div>
     </details>
@@ -343,7 +343,27 @@
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="app.js?v=n0jcg-air-traffic-center-v1"></script>
+<script>
+  (() => {
+    const returnButton = document.querySelector("#returnButton");
+    if (!returnButton) return;
+    const source = document.referrer;
+    if (source && source !== window.location.href) {
+      returnButton.href = source;
+      try {
+        const sourceUrl = new URL(source);
+        returnButton.title = `Return to ${sourceUrl.hostname}`;
+        returnButton.setAttribute("aria-label", `Return to ${sourceUrl.hostname}`);
+      } catch (_) {}
+    } else {
+      returnButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        if (window.history.length > 1) window.history.back();
+      });
+    }
+  })();
+</script>
+<script src="app.js?v=n0jcg-air-traffic-center-v6"></script>
 
 
 

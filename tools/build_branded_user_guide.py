@@ -306,7 +306,7 @@ def make_doc():
     doc.add_paragraph("Use the current LAN address of the Pi. The default port is 8090.")
     code(doc, "http://<pi-lan-ip>:8090")
     doc.add_paragraph("For a known installation, the URL may look like:")
-    code(doc, "http://192.168.68.137:8090")
+    code(doc, "http://192.168.68.110:8090")
     doc.add_heading("Validate the Pi service", level=2)
     doc.add_paragraph("These checks are for a maintainer with shell access. Run them on the Pi, not in the browser address bar.")
     code(doc, "sudo systemctl status pi-air-traffic-tracker.service --no-pager\ncurl -fsS http://127.0.0.1:8090/api/status | jq")

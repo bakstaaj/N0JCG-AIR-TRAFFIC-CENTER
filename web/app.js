@@ -301,6 +301,8 @@ let noaaHtmlAudioGeneration = 0;
 let liveNextCursor = 0;
 let liveNextPlayTime = 0;
 let livePumpTimer = null;
+let statusRefreshInFlight = false;
+let aircraftRefreshInFlight = false;
 let airbandAudioContext = null;
 let airbandAudioAuthorized = false;
 let airbandAudioCursor = 0;
@@ -344,8 +346,15 @@ function setMessage(id, message, kind) {
   node.textContent = message;
   node.className = 'message ' + (kind || '');
 }
+const AIR_TRAFFIC_ROUTE_PREFIX = window.location.pathname === '/air-traffic' || window.location.pathname.startsWith('/air-traffic/')
+  ? '/air-traffic'
+  : '';
+function apiUrl(path) {
+  if (typeof path !== 'string' || !path.startsWith('/api/')) return path;
+  return `${AIR_TRAFFIC_ROUTE_PREFIX}${path}`;
+}
 async function jsonRequest(url, options) {
-  const response = await fetch(url, Object.assign({cache: 'no-store'}, options || {}));
+  const response = await fetch(apiUrl(url), Object.assign({cache: 'no-store'}, options || {}));
   let result = null;
   try { result = await response.json(); } catch (_) {}
   if (!response.ok) {
@@ -412,7 +421,10 @@ function fitMapToReceiverRadius(position, radiusMiles) {
   if (!aircraftMap || !Array.isArray(position) || position.length < 2) return;
   const radiusMeters = Number(radiusMiles) * METERS_PER_MILE;
   if (!Number.isFinite(radiusMeters) || radiusMeters <= 0) return;
-  const bounds = L.circle(position, {radius: radiusMeters}).getBounds();
+  // Build bounds from the coordinate directly. Calling getBounds() on a
+  // circle that has not been added to a map makes Leaflet dereference an
+  // undefined map layerPointToLatLng handler.
+  const bounds = L.latLng(position).toBounds(radiusMeters);
   aircraftMap.fitBounds(bounds, {padding: [18, 18]});
 }
 
@@ -793,11 +805,10 @@ function recordTrailPoint(key, point, altitude, aircraft) {
   points.push(current);
   aircraftTrailHistory.set(key, points);
   aircraftLastPositions.set(key, point);
-  saveTrailHistory();
 }
 async function loadTrailHistoryFromServer(restoreCleared = false) {
   try {
-    const response = await fetch('/api/trails/history', {cache: 'no-store'});
+    const response = await fetch(apiUrl('/api/trails/history'), {cache: 'no-store'});
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     const serverTrails = data.trails || {};
@@ -987,7 +998,7 @@ async function eraseTrailHistory() {
 
   setMessage('mapMessage', 'Erasing browser and stored aircraft trails...', 'warning');
   try {
-    const response = await fetch('/api/trails/clear', {method: 'POST', cache: 'no-store'});
+    const response = await fetch(apiUrl('/api/trails/clear'), {method: 'POST', cache: 'no-store'});
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
     aircraftTrailClearedAt = Number(result.cleared_utc_ms || aircraftTrailClearedAt);
@@ -1094,6 +1105,8 @@ async function saveTrafficSources() {
 }
 
 async function updateStatus() {
+  if (statusRefreshInFlight) return;
+  statusRefreshInFlight = true;
   try {
     const status = requireObjectResponse(await jsonRequest('/api/status'), 'Receiver status');
     setText('stationName', status.noaa_station || 'NOAA Weather');
@@ -1107,6 +1120,8 @@ async function updateStatus() {
     if (!el('locationName').dataset.edited) renderLocation(status.receiver_location);
   } catch (error) {
     setMessage('audioMessage', `Status failed: ${error.message}`, 'error');
+  } finally {
+    statusRefreshInFlight = false;
   }
 }
 
@@ -1218,7 +1233,7 @@ async function fetchLocalAircraftByHex(rawHex) {
   const hex = String(rawHex || '').replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
   if (hex.length !== 6) return null;
   try {
-    const response = await fetch(`/api/aircraft/hex?hex=${encodeURIComponent(hex)}`, {cache: 'no-store'});
+  const response = await fetch(apiUrl(`/api/aircraft/hex?hex=${encodeURIComponent(hex)}`), {cache: 'no-store'});
     if (!response.ok) return null;
     const payload = await response.json();
     return payload && payload.matched && payload.aircraft ? payload.aircraft : null;
@@ -1253,7 +1268,7 @@ async function fetchAircraftEnrichment(identifier, callsign = '') {
   if (!identifier) return null;
   let url = `https://api.adsbdb.com/v0/aircraft/${encodeURIComponent(identifier)}`;
   if (callsign) url += `?callsign=${encodeURIComponent(callsign)}`;
-  const response = await fetch(url, {cache: 'no-store'});
+  const response = await fetch(apiUrl(url), {cache: 'no-store'});
   if (!response.ok) return null;
   const result = await response.json();
   return result.response && typeof result.response === 'object' ? result.response : null;
@@ -1336,7 +1351,7 @@ function routeOperatorFromAdsbdb(route) {
 let localOperatorPrefixLookupPromise = null;
 async function loadLocalOperatorPrefixLookup() {
   if (!localOperatorPrefixLookupPromise) {
-    localOperatorPrefixLookupPromise = fetch('/api/operator-prefixes.json', {cache: 'no-store'})
+    localOperatorPrefixLookupPromise = fetch(apiUrl('/api/operator-prefixes.json'), {cache: 'no-store'})
       .then(response => response.ok ? response.json() : {operators: {}})
       .catch(() => ({operators: {}}));
   }
@@ -1551,6 +1566,8 @@ async function showAircraftDetails(aircraft) {
 }
 
 async function updateAircraft() {
+  if (aircraftRefreshInFlight) return;
+  aircraftRefreshInFlight = true;
   try {
     const data = await jsonRequest('/api/aircraft.json');
     const body = el('aircraftRows');
@@ -1594,6 +1611,7 @@ async function updateAircraft() {
       setMessage('trafficSourceMessage', `Unified aircraft feed: 1090 ${enabled.adsb_1090 ? 'on' : 'off'} (${adsbCount}) · UAT ${enabled.uat_978 ? 'on' : 'off'} (${uatCount})`, (enabled.adsb_1090 || enabled.uat_978) ? 'good' : 'warning');
     }
     updateAircraftMap(activeAircraft);
+    saveTrailHistory();
     // ACTIVE_AIRCRAFT_LIST_ALL_RECORDS_V1:
     // Keep the scrollable list synchronized with every active map marker.
     const visibleAircraft = activeAircraft;
@@ -1620,6 +1638,8 @@ async function updateAircraft() {
     }
   } catch (error) {
     el('aircraftRows').innerHTML = `<tr><td colspan="8" class="empty">Aircraft data failed: ${error.message}</td></tr>`;
+  } finally {
+    aircraftRefreshInFlight = false;
   }
 }
 
@@ -1787,7 +1807,7 @@ async function saveLocation() {
 async function captureNoaa() {
   setMessage('audioMessage', 'Capturing 10 seconds of NOAA audio while ADS-B continues…', 'warning');
   try {
-    const response = await fetch(`/api/noaa/capture.wav?seconds=10&request=${Date.now()}`, {cache: 'no-store'});
+    const response = await fetch(apiUrl(`/api/noaa/capture.wav?seconds=10&request=${Date.now()}`), {cache: 'no-store'});
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const blob = await response.blob();
     if (audioObjectUrl) URL.revokeObjectURL(audioObjectUrl);
@@ -1807,7 +1827,7 @@ async function pumpLiveAudio() {
     if (liveAudioContext.state !== 'running') {
       throw new Error(`Shared scanner audio output is ${liveAudioContext.state}; click Reconnect NOAA Audio.`);
     }
-    const response = await fetch(`/api/noaa/live/audio.wav?from=${liveNextCursor}&samples=12000&request=${Date.now()}`, {cache: 'no-store'});
+    const response = await fetch(apiUrl(`/api/noaa/live/audio.wav?from=${liveNextCursor}&samples=12000&request=${Date.now()}`), {cache: 'no-store'});
     if (response.status === 204) {
       livePumpTimer = window.setTimeout(pumpLiveAudio, 120);
       return;
@@ -1865,7 +1885,7 @@ async function pumpAirbandAudio(holdId) {
   if (!airbandAudioAuthorized || !airbandAudioContext || airbandPlayingHoldId !== holdId) return;
   try {
     if (airbandAudioContext.state !== 'running') await airbandAudioContext.resume();
-    const response = await fetch(`/api/airband/scan/live/audio.wav?from=${airbandAudioCursor}&request=${Date.now()}`, {cache: 'no-store'});
+    const response = await fetch(apiUrl(`/api/airband/scan/live/audio.wav?from=${airbandAudioCursor}&request=${Date.now()}`), {cache: 'no-store'});
     if (response.status === 204) {
       airbandPumpTimer = window.setTimeout(() => pumpAirbandAudio(holdId), 60);
       return;
@@ -2142,7 +2162,7 @@ async function fillNoaaHtmlAudioQueue() {
   const generation = noaaHtmlAudioGeneration;
   try {
     while (liveListening && generation === noaaHtmlAudioGeneration && noaaHtmlAudioQueue.length < 4) {
-      const response = await fetch(`/api/noaa/live/audio.wav?from=${liveNextCursor}&samples=12000&request=${Date.now()}`, {cache: 'no-store'});
+      const response = await fetch(apiUrl(`/api/noaa/live/audio.wav?from=${liveNextCursor}&samples=12000&request=${Date.now()}`), {cache: 'no-store'});
       if (response.status === 204) break;
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const sourceSamples = Number(response.headers.get('X-Source-Samples') || 0);
@@ -2259,7 +2279,6 @@ async function autoNoaa(forceRescan = false) {
     liveNextPlayTime = liveAudioContext.currentTime + 0.20;
     const selected = (Number(status.noaa_frequency_hz) / 1000000).toFixed(3);
 
-
     const carrierEvidence = status.survey && status.survey.selected_carrier_margin_db != null
       ? ` · carrier +${Number(status.survey.selected_carrier_margin_db).toFixed(1)} dB`
       : '';
@@ -2321,7 +2340,7 @@ async function loadAirbandChannels() {
 async function testAirbandCapture(channel) {
   setMessage('airbandAudioMessage', `Capturing ${Number(channel.frequency_mhz).toFixed(3)} MHz AM diagnostic audio…`, 'warning');
   try {
-    const response = await fetch(`/api/airband/capture.wav?frequency_hz=${channel.frequency_hz}&seconds=10&request=${Date.now()}`, {cache: 'no-store'});
+      const response = await fetch(apiUrl(`/api/airband/capture.wav?frequency_hz=${channel.frequency_hz}&seconds=10&request=${Date.now()}`), {cache: 'no-store'});
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
@@ -2707,7 +2726,6 @@ async function toggleNoaaMenuOperation() {
   setOperationButtonsDisabled(true);
 
   try {
-    if (!liveListening) await prepareNoaaAudioForStart(true);
     const current = requireObjectResponse(await jsonRequest('/api/status'), 'Receiver status');
     if (current.live_audio_running && current.audio_mode === 'noaa_live' && !liveListening) {
       closeMenu();
@@ -2727,6 +2745,10 @@ async function toggleNoaaMenuOperation() {
     }
 
     closeMenu();
+    await showBusyAndPaint(
+      'Preparing NOAA Weatherâ€¦',
+      'Preparing shared browser audio and stopping Airband background scanning.'
+    );
     airbandRestartSuspended = true;
     const airband = await readAirbandStatus();
     airbandPausedForNoaa = airbandBackgroundWanted || Boolean(airband.airband_scan_running);
@@ -2908,7 +2930,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const fmt = (value) => value == null ? "—" : Number(value).toFixed(1);
 
   async function loadAirbandTuning() {
-    const response = await fetch("/api/settings/airband-scan", {cache: "no-store"});
+    const response = await fetch(apiUrl("/api/settings/airband-scan"), {cache: "no-store"});
     if (!response.ok) throw new Error("Unable to load Airband tuning settings.");
     const settings = await response.json();
     byId("airbandActivityThreshold").value = String(settings.airband_activity_threshold_rms);
@@ -2927,7 +2949,7 @@ document.addEventListener('DOMContentLoaded', () => {
       airband_search_mode: byId("airbandSearchMode").value,
       airband_spectrum_margin_db: Number(byId("airbandSpectrumMargin").value)
     };
-    const response = await fetch("/api/settings/airband-scan", {
+      const response = await fetch(apiUrl("/api/settings/airband-scan"), {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(payload)
@@ -2940,7 +2962,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function refreshAirbandMeasurement() {
     try {
-      const response = await fetch("/api/airband/scan/status", {cache: "no-store"});
+      const response = await fetch(apiUrl("/api/airband/scan/status"), {cache: "no-store"});
       if (!response.ok) return;
       const status = await response.json();
       const trigger = status.airband_activity_threshold_rms;
@@ -2979,14 +3001,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (target) target.textContent = value;
   };
   async function scannerAction(action) {
-    const response = await fetch(`/api/airband/scan/activity/${action}`, {method: "POST"});
+    const response = await fetch(apiUrl(`/api/airband/scan/activity/${action}`), {method: "POST"});
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || `Unable to ${action} held frequency.`);
     setMapState(action === "block" ? "Blocked; scanning resumes" : "Skipped; scanning resumes");
   }
   async function refreshMapScannerControls() {
     try {
-      const response = await fetch("/api/airband/scan/status", {cache: "no-store"});
+      const response = await fetch(apiUrl("/api/airband/scan/status"), {cache: "no-store"});
       if (!response.ok) return;
       const status = await response.json();
       const holding = Boolean(status.airband_hold_active);
@@ -3038,7 +3060,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (up) up.disabled = !holding || level >= 5000;
   }
   async function adjustSquelch(deltaRms) {
-    const response = await fetch("/api/settings/airband-playback-squelch", {
+    const response = await fetch(apiUrl("/api/settings/airband-playback-squelch"), {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({delta_rms: deltaRms})
@@ -3049,7 +3071,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   async function refreshSquelch() {
     try {
-      const response = await fetch("/api/airband/scan/status", {cache: "no-store"});
+      const response = await fetch(apiUrl("/api/airband/scan/status"), {cache: "no-store"});
       if (!response.ok) return;
       renderSquelch(await response.json());
     } catch (error) {
