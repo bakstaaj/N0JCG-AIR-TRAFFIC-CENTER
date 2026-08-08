@@ -7,7 +7,7 @@
 
 ## 1. Scope
 
-This guide covers installation, receiver identification, RTL-SDR EEPROM serial assignment, service setup, validation, and normal operation of **N0JCG AIR TRAFFIC CENTER**. The compatibility repository remains `PI-AIR-TRAFFIC-TRACKER`.
+This guide covers installation, receiver identification, RTL-SDR EEPROM serial assignment, service setup, validation, and normal operation of **N0JCG AIR TRAFFIC CENTER**. The canonical repository is `N0JCG-AIR-TRAFFIC-CENTER`; existing `PI-AIR-TRAFFIC-TRACKER` checkout paths remain supported for installed service compatibility.
 
 The three receiver roles covered here are:
 
@@ -81,7 +81,7 @@ On the Raspberry Pi:
 ```bash
 mkdir -p ~/sdrdev
 cd ~/sdrdev
-git clone https://github.com/bakstaaj/PI-AIR-TRAFFIC-TRACKER.git
+git clone https://github.com/bakstaaj/N0JCG-AIR-TRAFFIC-CENTER.git PI-AIR-TRAFFIC-TRACKER
 cd PI-AIR-TRAFFIC-TRACKER
 ```
 

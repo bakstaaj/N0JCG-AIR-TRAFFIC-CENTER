@@ -50,6 +50,22 @@ __pycache__/
 # Local script backups
 .pre_hardware_prep_backups/
 
+# Local cleanup and checkpoint artifacts
+/.pi_*/
+/.v0_1_*/
+/results/
+/281
+tools/*.bak*
+web/*.bak*
+
+# Local patching and hardware-session helpers; keep these outside the product tree
+tools/collect_*.sh
+tools/diagnose_*.sh
+tools/monitor_*.sh
+tools/patch_*.sh
+tools/pi_adsb_*.sh
+tools/pi_two_sdr_*.sh
+
 # Local script backups
 .pre_hardware_prep_fix_backups/
 

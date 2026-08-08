@@ -318,6 +318,178 @@ body { padding: 0; }
 .noaa-debug-state { color:#c9d8e8; min-width:112px; }
 .noaa-debug-state.recording { color:#ffca4b; font-weight:700; }
 
+/* N0JCG Open Radio Platform application theme.
+   Keep the operational interface dark, using the shared brand tokens for
+   hierarchy and the cyan accent only for live data and focus. */
+:root {
+  color-scheme: dark;
+  --n0-navy: #0a1f44;
+  --n0-blue: #1565c0;
+  --n0-cyan: #00b8d9;
+  --n0-slate: #2b3440;
+  --n0-slate-deep: #202a36;
+  --n0-mist: #f4f7fa;
+  --n0-muted: #b6c0cc;
+  --n0-border: #465467;
+  --n0-success: #168a4a;
+  --n0-warning: #b25e00;
+  --n0-danger: #c62828;
+  --bg: var(--n0-navy);
+  --panel: #102a50;
+  --panel2: var(--n0-slate);
+  --border: var(--n0-border);
+  --text: var(--n0-mist);
+  --muted: var(--n0-muted);
+  --blue: var(--n0-blue);
+  --green: var(--n0-success);
+  --yellow: #f5b74f;
+  --red: var(--n0-danger);
+}
+
+body {
+  background: var(--n0-navy);
+  color: var(--n0-mist);
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+}
+
+.app-header {
+  min-height: 72px;
+  height: auto;
+  padding: 12px 20px;
+  gap: 12px;
+  background: var(--n0-navy);
+  border-bottom: 2px solid var(--n0-blue);
+  box-shadow: 0 3px 16px rgba(0, 0, 0, .24);
+}
+
+.menu-button {
+  width: 44px;
+  height: 44px;
+  color: var(--n0-mist);
+  background: var(--n0-slate);
+  border: 1px solid var(--n0-border);
+}
+
+.return-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  color: var(--n0-mist);
+  background: var(--n0-slate);
+  border: 1px solid var(--n0-border);
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.return-button:hover,
+.return-button:focus-visible {
+  color: var(--n0-cyan);
+  border-color: var(--n0-cyan);
+}
+
+.return-icon { display: block; width: 24px; height: 24px; }
+
+.menu-button:hover,
+.menu-button:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 184, 217, .45);
+}
+
+.app-brand-mark {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.app-title h1 {
+  color: #fff;
+  font-family: Orbitron, Inter, "Segoe UI", Arial, sans-serif;
+  font-size: 20px;
+  letter-spacing: .035em;
+}
+
+.app-subtitle {
+  margin-top: 3px;
+  color: var(--n0-muted);
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+
+.app-subtitle span { color: var(--n0-cyan); padding: 0 5px; }
+.header-stat { background: var(--n0-slate); border: 1px solid rgba(199, 205, 212, .16); }
+.header-stat .value { font-variant-numeric: tabular-nums; }
+.header-stat .value.ready { color: #43d483; }
+.header-stat .label { color: #c2ccd7; }
+
+.focus-layout { background: #081a37; padding: 16px; gap: 16px; }
+.map-panel, .active-panel { background: var(--n0-slate); border-color: var(--n0-border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, .16); }
+.map-panel { border-top: 3px solid var(--n0-cyan); }
+.active-panel { border-top: 3px solid var(--n0-blue); }
+.active-panel h2 { font-family: Orbitron, Inter, Arial, sans-serif; font-size: 17px; letter-spacing: .025em; }
+#aircraftMap { background: #0a1f44; border-color: var(--n0-border); border-radius: 4px; }
+.map-toolbar button { background: var(--n0-blue); }
+.map-toolbar button:hover, button:hover:not(:disabled) { filter: brightness(1.12); }
+.map-toolbar button#mapWeatherRadarPlaybackToggle { background: var(--n0-cyan); color: #052238; }
+button.stop { background: var(--n0-danger); }
+button:disabled { background: #536171; color: #d5dbe2; }
+
+.menu-drawer { background: var(--n0-navy); border-right-color: var(--n0-border); }
+.menu-section { background: var(--n0-slate); border: 1px solid rgba(199, 205, 212, .12); }
+.compact-station { background: var(--n0-slate-deep); border-left: 3px solid var(--n0-cyan); border-radius: 4px; }
+.menu-section h3, .menu-section summary { color: #fff; }
+.menu-group { border-color: rgba(199, 205, 212, .2); }
+.menu-group h4, .label, th { color: #c2ccd7; }
+input, select { background: #0d223f; border-color: var(--n0-border); color: var(--n0-mist); }
+.message { background: rgba(10, 31, 68, .46); border-color: var(--n0-border); }
+.message.good { border-color: var(--n0-success); color: #70e0a0; }
+.message.warning { border-color: var(--n0-warning); color: #ffc56e; }
+.message.error { border-color: var(--n0-danger); color: #ff9c9c; }
+.menu-guide-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  color: var(--n0-cyan);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.menu-guide-link:hover,
+.menu-guide-link:focus-visible { color: #7be7f5; text-decoration: underline; }
+
+table th { border-bottom-color: var(--n0-border); }
+table td { border-bottom-color: rgba(199, 205, 212, .16); }
+.active-plane-row:hover { background: #344454; }
+.map-footer-status .tuning-active { color: #f5b74f; }
+.map-footer-status .tuning-paused { color: var(--n0-cyan); }
+.trail-hover-label { background: rgba(10, 31, 68, .94); border-color: var(--n0-cyan); }
+.trail-hover-label::before { border-top-color: var(--n0-cyan); }
+
+.busy-overlay, .aircraft-detail-overlay { background: rgba(4, 14, 31, .8); }
+.busy-card, .aircraft-detail-card { background: var(--n0-slate); border-color: var(--n0-border); }
+.busy-spinner { border-color: #536171; border-top-color: var(--n0-cyan); }
+.busy-elapsed { color: #ffc56e; }
+.aircraft-detail-header { border-bottom-color: var(--n0-border); }
+.aircraft-detail-close { background: var(--n0-slate-deep); border-color: var(--n0-border); }
+.aircraft-photo-frame { background: #0d223f; border-color: var(--n0-border); }
+
+@media (max-width: 650px) {
+  .app-header { padding: 10px 12px; }
+  .app-brand-mark { width: 36px; height: 36px; }
+  .app-title h1 { font-size: 14px; letter-spacing: .02em; }
+  .app-subtitle { font-size: 9px; }
+  .header-stat { min-width: 62px; padding: 5px 6px; }
+  .header-stat .value { font-size: 16px; }
+}
+
 /* RTP_WEATHER_RADAR_HISTORY_MENU_V1_START */
 .weather-radar-menu {
   display: flex;

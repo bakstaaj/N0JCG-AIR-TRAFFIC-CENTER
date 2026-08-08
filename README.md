@@ -1,8 +1,35 @@
 # N0JCG AIR TRAFFIC CENTER
 
-N0JCG AIR TRAFFIC CENTER is a Raspberry Pi 5 aircraft tracking and aviation audio application.
+**N0JCG Air Traffic Center** is an Open Radio Platform application for Raspberry Pi 5 aircraft tracking, aviation monitoring, weather radar, and receive-only aviation audio.
 
-The compatibility repository remains `PI-AIR-TRAFFIC-TRACKER`. It is the Raspberry Pi port of `bakstaaj/RTL-WINDOWS-ADS-B-TRACKER`, adapted for a Pi-native Linux runtime.
+It is part of the N0JCG product family and follows the shared N0JCG interface system: Engineering Navy, Platform Blue, Signal Cyan, Instrument Slate, Inter body text, Orbitron display accents, and explicit operator state.
+
+The standalone repository is published as `N0JCG-AIR-TRAFFIC-CENTER`. It is the Raspberry Pi port of `bakstaaj/RTL-WINDOWS-ADS-B-TRACKER`, adapted for a Pi-native Linux runtime. Existing `PI-AIR-TRAFFIC-TRACKER` checkout paths and runtime identifiers remain supported for compatibility.
+
+## Project boundary
+
+This repository is the standalone source of truth for the Air Traffic Center application. The N0JCG ROC repository may host a namespaced deployment for testing, but it does not replace this source repository or its API/runtime compatibility identifiers.
+
+The public product name is **N0JCG Air Traffic Center**. The canonical GitHub repository is [bakstaaj/N0JCG-AIR-TRAFFIC-CENTER](https://github.com/bakstaaj/N0JCG-AIR-TRAFFIC-CENTER). Internal names such as `PI-AIR-TRAFFIC-TRACKER`, `pi-air-traffic-tracker.service`, and the existing API routes remain stable for compatibility.
+
+## Documentation and validation
+
+- [Air Traffic Center user guide](docs/PI_AIR_TRAFFIC_TRACKER_USER_GUIDE.md)
+- [Branded end-user guide (DOCX)](docs/publications/N0JCG_Air_Traffic_Center_User_Guide_v1.0.docx)
+- [Branded end-user guide (PDF)](docs/publications/N0JCG_Air_Traffic_Center_User_Guide_v1.0.pdf)
+- [Release and acceptance scope](docs/RELEASE_V1_0_0.md)
+- [Development guardrails](docs/DEV_GUARDRAILS.md)
+- [Repository structure and contribution workflow](docs/REPOSITORY_STRUCTURE.md)
+
+The minimum source validation is:
+
+```bash
+node --check web/app.js
+python3 -m py_compile src/backend/pi_air_traffic_backend.py
+find tools deploy -type f -name '*.sh' -print0 | xargs -0 -r -n1 bash -n
+```
+
+Hardware-dependent validation must run on the target Raspberry Pi. Local browser checks do not prove receiver, antenna, decoder, or live audio behavior.
 
 <!-- V1_0_RELEASE_BEGIN -->
 ## v1.0.0 production release

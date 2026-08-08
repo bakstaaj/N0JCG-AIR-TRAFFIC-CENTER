@@ -1,0 +1,44 @@
+name: Validate Air Traffic Center
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  source-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Validate JavaScript
+        run: node --check web/app.js
+
+      - name: Validate Python
+        run: python -m py_compile src/backend/pi_air_traffic_backend.py
+
+      - name: Validate shell scripts
+        shell: bash
+        run: find tools deploy -type f -name '*.sh' -print0 | xargs -0 -r -n1 bash -n
+
+      - name: Validate product surfaces
+        shell: bash
+        run: |
+          grep -Fq 'N0JCG AIR TRAFFIC CENTER' web/index.html
+          grep -Fq 'PI_AIR_TRAFFIC_TRACKER_USER_GUIDE.md' README.md
+          test -f docs/PI_AIR_TRAFFIC_TRACKER_USER_GUIDE.md
+          test -f web/assets/N0JCG_Icon_Approved.png
+          test -f web/assets/N0JCG_Icon_Dark_Approved.png

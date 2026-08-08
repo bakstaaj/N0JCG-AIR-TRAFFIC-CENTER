@@ -34,8 +34,8 @@ require_repo_root() {
   fi
   local base
   base="$(basename "$PWD")"
-  if [[ "$base" != "PI-AIR-TRAFFIC-TRACKER" ]]; then
-    fail "expected repo root PI-AIR-TRAFFIC-TRACKER, got $base"
+  if [[ "$base" != "PI-AIR-TRAFFIC-TRACKER" && "$base" != "N0JCG-AIR-TRAFFIC-CENTER" ]]; then
+    fail "expected repo root PI-AIR-TRAFFIC-TRACKER or N0JCG-AIR-TRAFFIC-CENTER, got $base"
     exit 1
   fi
   pass "repo root validated"

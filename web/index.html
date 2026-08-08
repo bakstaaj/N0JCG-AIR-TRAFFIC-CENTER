@@ -4,15 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>N0JCG AIR TRAFFIC CENTER</title>
+<link rel="icon" href="assets/N0JCG_Icon_Approved.png" type="image/png">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 
-<link rel="stylesheet" href="app.css?v=leaflet-global-no-fade-v1">
+<link rel="stylesheet" href="app.css?v=n0jcg-air-traffic-brand-v2">
 </head>
 <body>
 <header class="app-header">
   <button id="menuToggle" class="menu-button" type="button" aria-label="Open menu" aria-expanded="false">&#9776;</button>
-  <div class="app-title"><h1>N0JCG AIR TRAFFIC CENTER</h1></div>
+  <a class="return-button" href="http://192.168.68.114:8095/" aria-label="Return to ROC dashboard" title="Return to ROC dashboard">
+    <svg class="return-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+      <path d="M20 18v-2a7 7 0 0 0-7-7H5m4-4-4 4 4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </a>
+  <img class="app-brand-mark" src="assets/N0JCG_Icon_Dark_Approved.png" alt="">
+  <div class="app-title"><h1>N0JCG AIR TRAFFIC CENTER</h1><div class="app-subtitle">Open Radio Platform <span aria-hidden="true">/</span> Aviation monitoring</div></div>
   <div class="header-stats">
     <div class="header-stat"><div class="label">Messages</div><div class="value" id="messageCount">—</div></div>
     <div class="header-stat"><div class="label">Aircraft</div><div class="value" id="aircraftCount">—</div></div>
@@ -35,6 +42,16 @@
     <button id="startLive" type="button" class="menu-hidden-control">Start Listening</button>
     <button id="stopLive" type="button" class="menu-hidden-control" disabled>Stop Listening</button>
     <button id="autoNoaa" type="button" class="menu-hidden-control">Scan and Listen</button>
+  </section>
+
+  <section class="menu-section menu-guide-section" aria-label="User Guide">
+    <details id="userGuideDetails">
+      <summary>User Guide</summary>
+      <div class="menu-group">
+        <a class="menu-guide-link" href="assets/user-guide/N0JCG_Air_Traffic_Center_User_Guide_v1.0.pdf" target="_blank" rel="noopener noreferrer">Open branded PDF guide <span aria-hidden="true">↗</span></a>
+        <p class="menu-help">End-user procedures, screenshots, receiver boundaries, and recovery guidance for N0JCG Air Traffic Center v1.0.0.</p>
+      </div>
+    </details>
   </section>
 
   <section class="menu-section">

@@ -56,7 +56,8 @@ This file records project-specific rules learned during development. Keep it upd
 
 ## Current Project Scope
 
-- Target repository: `bakstaaj/PI-AIR-TRAFFIC-TRACKER`.
+- Target repository: `bakstaaj/N0JCG-AIR-TRAFFIC-CENTER`.
+- Legacy checkout path: `PI-AIR-TRAFFIC-TRACKER`; preserve it where an installed service or script depends on the path.
 - Target hardware roles:
   - FlyCatcher ADS-B 1090 MHz side: primary ADS-B receiver.
   - NESDR Nano2+: NOAA Weather Radio and civil airband AM receiver.
