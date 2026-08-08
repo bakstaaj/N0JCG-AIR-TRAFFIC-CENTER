@@ -369,8 +369,10 @@ function renderRegistration(registration) {
         : value.trial_active
           ? formatTrialClock(value.trial_remaining_seconds)
           : 'READY';
-    topBadge.title = registered ? 'Registered license' : expired ? 'Trial ended — open Registration' : 'Open Registration';
+    topBadge.title = registered ? 'Registered license' : expired ? 'Restart five-minute trial' : 'Restart five-minute trial';
   }
+  const topButton = el('registrationTopButton');
+  if (topButton) topButton.disabled = registered;
   setText('registrationInstallationSerial', value.serial_number || 'Unavailable');
   const status = registered
     ? `Registered license ${value.license_suffix || ''} · Installation S/N ${value.serial_number || '—'}`
@@ -405,6 +407,19 @@ async function activateLicense() {
     await updateStatus();
   } catch (error) {
     setMessage('registrationStatusText', `Activation failed: ${error.message}`, 'error');
+    if (button) button.disabled = false;
+  }
+}
+async function restartFreeTrial() {
+  const button = el('registrationTopButton');
+  if (button) button.disabled = true;
+  try {
+    const result = await jsonRequest('/api/license/trial/reset', {method: 'POST'});
+    renderRegistration(result.registration);
+    setMessage('registrationStatusText', 'Free five-minute trial restarted manually.', 'warning');
+  } catch (error) {
+    setMessage('registrationStatusText', `Trial restart failed: ${error.message}`, 'error');
+  } finally {
     if (button) button.disabled = false;
   }
 }
@@ -2907,14 +2922,7 @@ function bindControls() {
   el('cancelLocationPick').addEventListener('click', cancelReceiverLocationPick);
   el('menuToggle').addEventListener('click', toggleMenu);
   el('menuBackdrop').addEventListener('click', closeMenu);
-  el('registrationTopButton').addEventListener('click', () => {
-    openMenu();
-    const details = el('registrationDetails');
-    if (details) {
-      details.open = true;
-      window.setTimeout(() => details.scrollIntoView({block: 'nearest'}), 0);
-    }
-  });
+  el('registrationTopButton').addEventListener('click', restartFreeTrial);
   el('noaaMenuToggle').addEventListener('click', toggleNoaaMenuOperation);
   el('airbandMenuToggle').addEventListener('click', toggleAirbandMenuOperation);
   el('activateLicenseBtn').addEventListener('click', activateLicense);

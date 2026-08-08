@@ -166,6 +166,15 @@ class AirTrafficTrialController:
             self._cancel_locked()
         return self.status()
 
+    def reset_trial(self) -> dict[str, Any]:
+        """Restart the manual unregistered trial when no license is active."""
+        with self.lock:
+            if self.client.status().get("registered"):
+                return self.status()
+            self._cancel_locked()
+            self._arm_locked()
+        return self.status()
+
     def is_expired(self) -> bool:
         with self.lock:
             return self.expired and not self.client.status().get("registered")
@@ -1259,6 +1268,9 @@ def patch_pi_license_handler(pi_port: Any) -> None:
                 self.send_json({"ok": True, "registration": controller.activate(self.read_json())})
             except Exception as exc:
                 self.send_json({"ok": False, "error": str(exc), "registration": controller.status()}, HTTPStatus.BAD_REQUEST)
+            return
+        if request.path == "/api/license/trial/reset":
+            self.send_json({"ok": True, "registration": controller.reset_trial()})
             return
         protected_paths = {
             "/api/noaa/live/start",
