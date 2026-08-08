@@ -32,6 +32,7 @@ from urllib.error import URLError
 from urllib.parse import urlparse
 
 import rtl_windows_backend as win_backend
+from n0jcg_licensing import LicenseClient, LicenseError
 
 ADSB_SERIAL = os.environ.get("PI_AIR_TRAFFIC_ADSB_SERIAL", "00001090")
 AUDIO_SERIAL = os.environ.get("PI_AIR_TRAFFIC_AUDIO_SERIAL", "00000162")
@@ -50,6 +51,129 @@ ADSB_STALE_CACHE_SECONDS = float(os.environ.get("PI_AIR_TRAFFIC_ADSB_STALE_CACHE
 
 LOG = logging.getLogger("pi_air_traffic_backend")
 RTL_TEST_DEVICE_RE = re.compile(r"^\s*(\d+):\s*([^,]+),\s*([^,]+),\s*SN:\s*(\S+)\s*$")
+
+
+def air_traffic_app_version(root: Path) -> str:
+    try:
+        return (root / "VERSION").read_text(encoding="utf-8").strip() or "1.0.0"
+    except OSError:
+        return "1.0.0"
+
+
+class AirTrafficTrialController:
+    """Enforce the five-minute unregistered trial across every receiver path."""
+
+    TRIAL_SECONDS = 300
+
+    def __init__(self, server: Any, root: Path) -> None:
+        self.server = server
+        self.root = root
+        self.client = LicenseClient(
+            product_slug="air-traffic-center",
+            app_version=air_traffic_app_version(root),
+            state_root=pi_runtime_root(root) / "settings",
+        )
+        self.lock = threading.RLock()
+        self.timer: threading.Timer | None = None
+        self.started_epoch: float | None = None
+        self.deadline_epoch: float | None = None
+        self.expired = False
+        self.generation = 0
+        self.client.start_background_refresh()
+
+    def _cancel_locked(self, *, reset_expired: bool = True) -> None:
+        self.generation += 1
+        if self.timer is not None:
+            self.timer.cancel()
+        self.timer = None
+        self.started_epoch = None
+        self.deadline_epoch = None
+        if reset_expired:
+            self.expired = False
+
+    def _arm_locked(self) -> None:
+        registration = self.client.status()
+        if registration.get("registered"):
+            self._cancel_locked()
+            return
+        if self.deadline_epoch is not None or self.expired:
+            return
+        now = time.time()
+        self.generation += 1
+        generation = self.generation
+        self.started_epoch = now
+        self.deadline_epoch = now + self.TRIAL_SECONDS
+        self.timer = threading.Timer(self.TRIAL_SECONDS, self._expire, args=(generation,))
+        self.timer.daemon = True
+        self.timer.start()
+
+    def observe_activity(self, active: bool) -> None:
+        with self.lock:
+            if self.client.status().get("registered"):
+                self._cancel_locked()
+            elif active:
+                self._arm_locked()
+
+    def _expire(self, generation: int) -> None:
+        with self.lock:
+            if generation != self.generation or self.client.status().get("registered"):
+                return
+            self.expired = True
+        LOG.warning("Unregistered five-minute Air Traffic Center trial ended; stopping all receiver paths")
+        try:
+            self.server.scan.stop()
+        except Exception:
+            LOG.exception("Failed to stop Airband scanner at trial expiry")
+        try:
+            self.server.audio_ops.live_noaa_stop()
+        except Exception:
+            LOG.exception("Failed to stop NOAA audio at trial expiry")
+        try:
+            self.server.audio.stop_live()
+        except Exception:
+            LOG.exception("Failed to stop shared audio at trial expiry")
+        try:
+            self.server.manager.stop()
+        except Exception:
+            LOG.exception("Failed to stop ADS-B tracking at trial expiry")
+
+    def status(self) -> dict[str, Any]:
+        registration = dict(self.client.status())
+        with self.lock:
+            remaining = None
+            if self.deadline_epoch is not None:
+                remaining = 0 if self.expired else max(0, int(self.deadline_epoch - time.time() + 0.999))
+            registration.update(
+                {
+                    "trial_limit_seconds": None if registration.get("registered") else self.TRIAL_SECONDS,
+                    "trial_active": bool(self.deadline_epoch is not None and remaining),
+                    "trial_started_epoch": self.started_epoch,
+                    "trial_expires_epoch": self.deadline_epoch,
+                    "trial_remaining_seconds": remaining,
+                    "trial_expired": self.expired,
+                }
+            )
+            return registration
+
+    def activate(self, request: dict[str, Any]) -> dict[str, Any]:
+        if not isinstance(request, dict):
+            raise LicenseError("activation request must be an object")
+        result = self.client.activate(
+            str(request.get("license_serial") or ""),
+            str(request.get("email") or ""),
+        )
+        with self.lock:
+            self._cancel_locked()
+        return self.status()
+
+    def is_expired(self) -> bool:
+        with self.lock:
+            return self.expired and not self.client.status().get("registered")
+
+    def close(self) -> None:
+        with self.lock:
+            self._cancel_locked()
+        self.client.close()
 
 
 def pi_runtime_root(root: Path) -> Path:
@@ -1084,6 +1208,78 @@ def patch_pi_port_handler_status(pi_port: Any) -> None:
     pi_port.PiPortHandler.port_status = pi_air_traffic_port_status
 
 
+def patch_pi_license_handler(pi_port: Any) -> None:
+    """Add backend-enforced registration and five-minute trial controls."""
+    handler = pi_port.PiPortHandler
+    if getattr(handler, "_pi_air_traffic_license_patched", False):
+        return
+
+    original_status = handler.port_status
+    original_get = handler.do_GET
+    original_post = handler.do_POST
+
+    def controller_for(request_handler: Any) -> AirTrafficTrialController:
+        controller = getattr(request_handler.server, "trial_controller", None)
+        if controller is None:
+            root = getattr(getattr(request_handler.server, "manager", None), "root", Path.cwd())
+            controller = AirTrafficTrialController(request_handler.server, Path(root))
+            setattr(request_handler.server, "trial_controller", controller)
+        return controller
+
+    def port_status_with_license(self: Any) -> dict[str, Any]:
+        payload = original_status(self)
+        active = bool(
+            payload.get("readsb_json_available")
+            or payload.get("audio_busy")
+            or payload.get("airband_scan_running")
+        )
+        controller = controller_for(self)
+        controller.observe_activity(active)
+        payload["registration"] = controller.status()
+        return payload
+
+    def do_get_with_license(self: Any) -> None:
+        request = urlparse(self.path)
+        if request.path in ("/api/license/status", "/api/registration/status"):
+            self.send_json({"ok": True, "registration": controller_for(self).status()})
+            return
+        if request.path in ("/api/aircraft.json", "/api/aircraft") and controller_for(self).is_expired():
+            self.send_json(
+                {"error": "The five-minute trial has ended. Register this Air Traffic Center to continue.", "registration": controller_for(self).status()},
+                HTTPStatus.FORBIDDEN,
+            )
+            return
+        original_get(self)
+
+    def do_post_with_license(self: Any) -> None:
+        request = urlparse(self.path)
+        controller = controller_for(self)
+        if request.path in ("/api/license/activate", "/api/registration/activate"):
+            try:
+                self.send_json({"ok": True, "registration": controller.activate(self.read_json())})
+            except Exception as exc:
+                self.send_json({"ok": False, "error": str(exc), "registration": controller.status()}, HTTPStatus.BAD_REQUEST)
+            return
+        protected_paths = {
+            "/api/noaa/live/start",
+            "/api/noaa/auto/start",
+            "/api/noaa/auto/rescan",
+            "/api/airband/scan/activity/start",
+        }
+        if request.path in protected_paths and controller.is_expired():
+            self.send_json(
+                {"error": "The five-minute trial has ended. Register this Air Traffic Center to continue.", "registration": controller.status()},
+                HTTPStatus.FORBIDDEN,
+            )
+            return
+        original_post(self)
+
+    handler.port_status = port_status_with_license
+    handler.do_GET = do_get_with_license
+    handler.do_POST = do_post_with_license
+    setattr(handler, "_pi_air_traffic_license_patched", True)
+
+
 
 def patch_pi_uat_handler(pi_port: Any) -> None:
     """Add manual UAT 978 status/start/stop endpoints to the Pi-port handler."""
@@ -1158,6 +1354,7 @@ def main() -> int:
     pi_port.AUDIO_SERIAL = AUDIO_SERIAL
     pi_port.windows_path = linux_path
     patch_pi_port_handler_status(pi_port)
+    patch_pi_license_handler(pi_port)
     patch_pi_uat_handler(pi_port)
     patch_pi_traffic_source_handler(pi_port)
     return pi_port.main()

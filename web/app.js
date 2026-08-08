@@ -346,6 +346,56 @@ function setMessage(id, message, kind) {
   node.textContent = message;
   node.className = 'message ' + (kind || '');
 }
+function formatTrialClock(seconds) {
+  const value = Math.max(0, Math.floor(Number(seconds) || 0));
+  return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
+}
+function renderRegistration(registration) {
+  const value = registration && typeof registration === 'object' ? registration : {};
+  const registered = Boolean(value.registered);
+  const expired = Boolean(value.trial_expired);
+  const badge = el('registrationPanelBadge');
+  if (badge) {
+    badge.className = `registration-badge ${registered ? 'good' : expired ? 'bad' : 'warning'}`;
+    badge.textContent = registered ? 'REGISTERED' : expired ? 'TRIAL ENDED' : 'UNREGISTERED';
+  }
+  setText('registrationInstallationSerial', value.serial_number || 'Unavailable');
+  const status = registered
+    ? `Registered license ${value.license_suffix || ''} · Installation S/N ${value.serial_number || '—'}`
+    : expired
+      ? `Trial ended for installation ${value.serial_number || '—'}. Register the app to resume receiver operation.`
+      : value.trial_active
+        ? `Trial active · ${formatTrialClock(value.trial_remaining_seconds)} remaining · Installation S/N ${value.serial_number || '—'}`
+        : `Installation S/N ${value.serial_number || '—'} · Trial starts when receiver activity begins.`;
+  setMessage('registrationStatusText', status, registered ? 'good' : expired ? 'error' : 'warning');
+  const activate = el('activateLicenseBtn');
+  if (activate) activate.disabled = registered;
+}
+async function activateLicense() {
+  const button = el('activateLicenseBtn');
+  const licenseSerial = String(el('licenseSerialInput')?.value || '').trim();
+  const email = String(el('licenseEmailInput')?.value || '').trim();
+  if (!licenseSerial || !email) {
+    setMessage('registrationStatusText', 'Enter the license S/N and registered email address.', 'warning');
+    return;
+  }
+  if (button) button.disabled = true;
+  setMessage('registrationStatusText', 'Contacting N0JCG licensing service…', 'warning');
+  try {
+    const result = await jsonRequest('/api/license/activate', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({license_serial: licenseSerial, email})
+    });
+    if (el('licenseSerialInput')) el('licenseSerialInput').value = '';
+    renderRegistration(result.registration);
+    setMessage('registrationStatusText', `License activated for installation ${result.registration?.serial_number || '—'}.`, 'good');
+    await updateStatus();
+  } catch (error) {
+    setMessage('registrationStatusText', `Activation failed: ${error.message}`, 'error');
+    if (button) button.disabled = false;
+  }
+}
 const AIR_TRAFFIC_ROUTE_PREFIX = window.location.pathname === '/air-traffic' || window.location.pathname.startsWith('/air-traffic/')
   ? '/air-traffic'
   : '';
@@ -1115,6 +1165,7 @@ async function updateStatus() {
     setText('messageCount', formattedNumber(status.messages));
     setText('aircraftCount', formattedNumber(status.aircraft_count));
     setText('positionCount', formattedNumber(status.aircraft_with_position));
+    renderRegistration(status.registration);
     renderTrafficSources(status);
     updateAudioButtons(status);
     if (!el('locationName').dataset.edited) renderLocation(status.receiver_location);
@@ -2846,6 +2897,7 @@ function bindControls() {
   el('menuBackdrop').addEventListener('click', closeMenu);
   el('noaaMenuToggle').addEventListener('click', toggleNoaaMenuOperation);
   el('airbandMenuToggle').addEventListener('click', toggleAirbandMenuOperation);
+  el('activateLicenseBtn').addEventListener('click', activateLicense);
   el('airbandSkipHeld').addEventListener('click', skipHeldAirbandChannel);
   el('airbandBlockHeld').addEventListener('click', blockHeldAirbandChannel);
   el('clearAirbandBlocks').addEventListener('click', clearBlockedAirbandFrequencies);
@@ -2908,7 +2960,8 @@ document.addEventListener('DOMContentLoaded', () => {
   updateAircraft();
   const refreshWhenMenuClosed = (label, callback) => () => {
     const menu = el('appMenu');
-    if (menu && menu.classList.contains('open')) {
+    const registrationOpen = Boolean(el('registrationDetails')?.open);
+    if (menu && menu.classList.contains('open') && !registrationOpen) {
       window.__trafficSourceRefreshPaused = {paused: true, label, at: new Date().toISOString()};
       return;
     }

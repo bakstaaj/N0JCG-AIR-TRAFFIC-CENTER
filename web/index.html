@@ -54,6 +54,26 @@
     </details>
   </section>
 
+  <section class="menu-section menu-registration-section" aria-label="Registration">
+    <details id="registrationDetails">
+      <summary>Registration</summary>
+      <div class="menu-group">
+        <div class="registration-heading">
+          <strong>N0JCG Air Traffic Center license</strong>
+          <span id="registrationPanelBadge" class="registration-badge warning">UNREGISTERED</span>
+        </div>
+        <p class="menu-help">Unregistered operation is available for five minutes after receiver activity begins. Register this installation to continue tracking aircraft, NOAA audio, and Airband scanning.</p>
+        <div class="registration-fields">
+          <label>Installation S/N<input id="registrationInstallationSerial" type="text" readonly value="Loading…"></label>
+          <label>License S/N<input id="licenseSerialInput" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="N0JCG-XXX-XXXX-XXXX-XXXX-XXXX"></label>
+          <label>Registered email<input id="licenseEmailInput" type="email" autocomplete="email" placeholder="operator@example.com"></label>
+        </div>
+        <button id="activateLicenseBtn" type="button">Activate license</button>
+        <div id="registrationStatusText" class="message compact-message">Registration status loading…</div>
+      </div>
+    </details>
+  </section>
+
   <section class="menu-section">
     <details id="configurationDetails" open>
       <summary>Configuration</summary>

@@ -478,6 +478,14 @@ input, select { background: #0d223f; border-color: var(--n0-border); color: var(
   letter-spacing: .04em;
   line-height: 1;
 }
+.registration-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.registration-heading strong { font-size: 12px; }
+.registration-badge { border: 1px solid var(--n0-warning); border-radius: 999px; color: #ffc56e; font-size: 9px; font-weight: 800; letter-spacing: .04em; padding: 2px 6px; white-space: nowrap; }
+.registration-badge.good { border-color: var(--n0-success); color: #70e0a0; }
+.registration-badge.bad { border-color: var(--n0-danger); color: #ff9c9c; }
+.registration-fields { display: grid; gap: 6px; margin: 7px 0; }
+.registration-fields label { display: grid; gap: 3px; color: #c2ccd7; font-size: 10px; }
+.registration-fields input { width: 100%; box-sizing: border-box; }
 
 table th { border-bottom-color: var(--n0-border); }
 table td { border-bottom-color: rgba(199, 205, 212, .16); }
