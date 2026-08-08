@@ -1270,7 +1270,11 @@ def patch_pi_license_handler(pi_port: Any) -> None:
                 self.send_json({"ok": False, "error": str(exc), "registration": controller.status()}, HTTPStatus.BAD_REQUEST)
             return
         if request.path == "/api/license/trial/reset":
-            self.send_json({"ok": True, "registration": controller.reset_trial()})
+            try:
+                self.send_json({"ok": True, "registration": controller.reset_trial()})
+            except Exception as exc:
+                LOG.exception("Trial reset request failed")
+                self.send_json({"ok": False, "error": str(exc), "registration": controller.status()}, HTTPStatus.CONFLICT)
             return
         protected_paths = {
             "/api/noaa/live/start",
