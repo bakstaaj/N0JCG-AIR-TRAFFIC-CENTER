@@ -359,6 +359,18 @@ function renderRegistration(registration) {
     badge.className = `registration-badge ${registered ? 'good' : expired ? 'bad' : 'warning'}`;
     badge.textContent = registered ? 'REGISTERED' : expired ? 'TRIAL ENDED' : 'UNREGISTERED';
   }
+  const topBadge = el('registrationBadge');
+  if (topBadge) {
+    topBadge.className = `header-trial-badge ${registered ? 'good' : expired ? 'bad' : 'warning'}`;
+    topBadge.textContent = registered
+      ? 'OK'
+      : expired
+        ? 'ENDED'
+        : value.trial_active
+          ? formatTrialClock(value.trial_remaining_seconds)
+          : 'READY';
+    topBadge.title = registered ? 'Registered license' : expired ? 'Trial ended — open Registration' : 'Open Registration';
+  }
   setText('registrationInstallationSerial', value.serial_number || 'Unavailable');
   const status = registered
     ? `Registered license ${value.license_suffix || ''} · Installation S/N ${value.serial_number || '—'}`
@@ -2895,6 +2907,14 @@ function bindControls() {
   el('cancelLocationPick').addEventListener('click', cancelReceiverLocationPick);
   el('menuToggle').addEventListener('click', toggleMenu);
   el('menuBackdrop').addEventListener('click', closeMenu);
+  el('registrationTopButton').addEventListener('click', () => {
+    openMenu();
+    const details = el('registrationDetails');
+    if (details) {
+      details.open = true;
+      window.setTimeout(() => details.scrollIntoView({block: 'nearest'}), 0);
+    }
+  });
   el('noaaMenuToggle').addEventListener('click', toggleNoaaMenuOperation);
   el('airbandMenuToggle').addEventListener('click', toggleAirbandMenuOperation);
   el('activateLicenseBtn').addEventListener('click', activateLicense);
