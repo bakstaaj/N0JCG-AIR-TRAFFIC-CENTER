@@ -2695,7 +2695,13 @@ def main() -> int:
     signal.signal(signal.SIGTERM, shutdown_handler)
     try:
         if args.autostart:
-            manager.start()
+            try:
+                manager.start()
+            except Exception as exc:
+                # Keep the operator UI/API available when radios are unplugged,
+                # unavailable, or temporarily claimed by another service. The
+                # normal on-demand start path will retry when hardware returns.
+                LOG.exception("RTL-SDR autostart unavailable; continuing with UI/API online: %s", exc)
         trails.start()
         LOG.info("Pi UI Windows port listening at http://%s:%s", args.host, args.port)
         server.serve_forever()
