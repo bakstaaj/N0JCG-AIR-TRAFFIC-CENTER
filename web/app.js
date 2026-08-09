@@ -320,6 +320,7 @@ let receiverMapLocation = null;
 let aircraftMapMarkers = new Map();
 let aircraftLastPositions = new Map();
 let aircraftTrailSegments = new Map();
+let aircraftTrialExpiredDisplay = false;
 let aircraftMapFirstFit = true;
 let receiverInitialMapViewApplied = false;
 let receiverLocationPickActive = false;
@@ -354,6 +355,12 @@ function renderRegistration(registration) {
   const value = registration && typeof registration === 'object' ? registration : {};
   const registered = Boolean(value.registered);
   const expired = Boolean(value.trial_expired);
+  if (expired) {
+    if (!aircraftTrialExpiredDisplay) clearAircraftDisplayForTrial();
+    aircraftTrialExpiredDisplay = true;
+  } else {
+    aircraftTrialExpiredDisplay = false;
+  }
   const badge = el('registrationPanelBadge');
   if (badge) {
     badge.className = `registration-badge ${registered ? 'good' : expired ? 'bad' : 'warning'}`;
@@ -764,6 +771,15 @@ function removeTrailLayersForAircraft(key) {
 function removeTrailLayers() {
   if (!aircraftMap) return;
   for (const key of Array.from(aircraftTrailSegments.keys())) removeTrailLayersForAircraft(key);
+}
+function clearAircraftDisplayForTrial() {
+  const body = el('aircraftRows');
+  if (body) body.innerHTML = '<tr><td colspan="4" class="empty">Aircraft tracking stopped — five-minute trial ended.</td></tr>';
+  setText('aircraftCount', '0');
+  setText('positionCount', '0');
+  if (aircraftMap) updateAircraftMap([]);
+  removeTrailLayers();
+  setMessage('mapMessage', 'Aircraft tracking stopped — register or restart the free trial to resume.', 'warning');
 }
 function formatTrailLastSeen(timestamp) {
   const milliseconds = Number(timestamp);
@@ -1645,9 +1661,14 @@ async function showAircraftDetails(aircraft) {
 
 async function updateAircraft() {
   if (aircraftRefreshInFlight) return;
+  if (aircraftTrialExpiredDisplay) return;
   aircraftRefreshInFlight = true;
   try {
     const data = await jsonRequest('/api/aircraft.json');
+    if (aircraftTrialExpiredDisplay) {
+      clearAircraftDisplayForTrial();
+      return;
+    }
     const body = el('aircraftRows');
     const aircraft = Array.isArray(data.aircraft) ? data.aircraft : [];
     const activeAircraft = aircraft
