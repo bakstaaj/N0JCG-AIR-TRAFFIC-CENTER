@@ -379,7 +379,10 @@ function renderRegistration(registration) {
     topBadge.title = registered ? 'Registered license' : expired ? 'Restart five-minute trial' : 'Restart five-minute trial';
   }
   const topButton = el('registrationTopButton');
-  if (topButton) topButton.disabled = registered;
+  if (topButton) {
+    topButton.disabled = registered;
+    topButton.hidden = registered;
+  }
   setText('registrationInstallationSerial', value.serial_number || 'Unavailable');
   const status = registered
     ? `Registered license ${value.license_suffix || ''} · Installation S/N ${value.serial_number || '—'}`
