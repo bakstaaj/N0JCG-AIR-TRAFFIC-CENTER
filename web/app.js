@@ -383,14 +383,13 @@ function renderRegistration(registration) {
     topButton.disabled = registered;
     topButton.hidden = registered;
   }
-  setText('registrationInstallationSerial', value.serial_number || 'Unavailable');
   const status = registered
-    ? `Registered license ${value.license_suffix || ''} · Installation S/N ${value.serial_number || '—'}`
+    ? `Registered license ${value.license_suffix || ''}`
     : expired
-      ? `Trial ended for installation ${value.serial_number || '—'}. Register the app to resume receiver operation.`
+      ? 'Trial ended. Register the app to resume receiver operation.'
       : value.trial_active
-        ? `Trial active · ${formatTrialClock(value.trial_remaining_seconds)} remaining · Installation S/N ${value.serial_number || '—'}`
-        : `Installation S/N ${value.serial_number || '—'} · Trial starts when receiver activity begins.`;
+        ? `Trial active · ${formatTrialClock(value.trial_remaining_seconds)} remaining`
+        : 'Trial starts when receiver activity begins.';
   setMessage('registrationStatusText', status, registered ? 'good' : expired ? 'error' : 'warning');
   const activate = el('activateLicenseBtn');
   if (activate) activate.disabled = registered;
