@@ -69,7 +69,7 @@ class AirTrafficTrialController:
         self.server = server
         self.root = root
         self.client = LicenseClient(
-            product_slug="air-traffic-center",
+            product_slug="air-traffic",
             app_version=air_traffic_app_version(root),
             state_root=pi_runtime_root(root) / "settings",
         )

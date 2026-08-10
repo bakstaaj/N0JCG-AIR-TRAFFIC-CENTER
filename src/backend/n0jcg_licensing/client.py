@@ -15,7 +15,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-DEFAULT_API_URL = "https://www.n0jcg.com/api/v1/licenses/validate"
+LICENSE_API_URL = "https://www.n0jcg.com/api/v1/licenses/validate"
+DEFAULT_API_URL = LICENSE_API_URL
 DEFAULT_REFRESH_SECONDS = 24 * 60 * 60
 LICENSE_PATTERN = re.compile(r"^N0JCG-[A-Z0-9]{3}(?:-[A-Z2-9]{4}){4}$")
 INSTALLATION_PATTERN = re.compile(r"^N0JCG-[0-9A-F]{4}(?:-[0-9A-F]{4}){3}$")
@@ -136,7 +137,9 @@ class LicenseClient:
         self.app_version = str(app_version).strip()
         self.state_root = Path(state_root)
         self.environment = os.environ if environment is None else environment
-        self.api_url = str(self.environment.get("N0JCG_LICENSE_API_URL", api_url)).strip()
+        # Production activation must always use the canonical Worker endpoint.
+        # Do not allow a stale service environment variable to redirect it.
+        self.api_url = LICENSE_API_URL
         self.credentials_path = self.state_root / "license_credentials.json"
         self.lease_path = self.state_root / "license_lease.json"
         self._opener = opener
@@ -226,7 +229,11 @@ class LicenseClient:
         request = urllib.request.Request(
             self.api_url,
             data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json", "Accept": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": f"N0JCG-Air-Traffic/{self.app_version}",
+            },
             method="POST",
         )
         try:
