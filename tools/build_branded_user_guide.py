@@ -13,7 +13,10 @@ OUT = ROOT / "docs" / "publications"
 OUT.mkdir(parents=True, exist_ok=True)
 ASSETS = ROOT / "docs" / "assets" / "user-guide"
 BRAND = ROOT.parent / "N0JCG Website" / "website" / "assets" / "brand"
-DOCX_PATH = OUT / "N0JCG_Air_Traffic_Center_User_Guide_v1.0.docx"
+GUIDE_VERSION = "1.1.1"
+GUIDE_SHORT_VERSION = "1.1"
+CAPTURE_DATE = "August 10, 2026"
+DOCX_PATH = OUT / f"N0JCG_Air_Traffic_Center_User_Guide_v{GUIDE_SHORT_VERSION}.docx"
 
 NAVY = "0A1F44"
 BLUE = "1565C0"
@@ -109,7 +112,7 @@ def add_image(doc, path, caption, width=6.25):
     cap = doc.add_paragraph()
     cap.style = "Caption"
     cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r = cap.add_run(caption + "  |  N0JCG Air Traffic Center v1.0.0")
+    r = cap.add_run(caption + f"  |  N0JCG Air Traffic Center v{GUIDE_VERSION}")
     r.font.name = "Calibri"
     r.font.size = Pt(8.5)
     r.font.italic = True
@@ -205,7 +208,7 @@ def add_header_footer(section):
     fp = footer.paragraphs[0]
     fp.alignment = WD_ALIGN_PARAGRAPH.CENTER
     fp.paragraph_format.space_before = Pt(0)
-    r = fp.add_run("N0JCG Open Radio Platform  •  v1.0.0  •  ")
+    r = fp.add_run(f"N0JCG Open Radio Platform  •  v{GUIDE_VERSION}  •  ")
     r.font.name = "Calibri"; r.font.size = Pt(8); r.font.color.rgb = RGBColor.from_string(MID)
     add_page_field(fp)
 
@@ -248,7 +251,7 @@ def cover(doc):
     p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER; p.paragraph_format.space_before = Pt(14); p.paragraph_format.space_after = Pt(4)
     r = p.add_run("Operate the map, traffic sources, weather radar, and receive-only aviation audio"); r.font.size = Pt(12); r.font.color.rgb = RGBColor.from_string(SLATE)
     p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER; p.paragraph_format.space_after = Pt(12)
-    r = p.add_run("Version 1.0.0  |  Status: Release baseline  |  Owner: N0JCG Open Radio Platform  |  August 7, 2026"); r.font.size = Pt(9); r.font.color.rgb = RGBColor.from_string(MID)
+    r = p.add_run(f"Version {GUIDE_VERSION}  |  Status: Current release  |  Owner: N0JCG Open Radio Platform  |  {CAPTURE_DATE}"); r.font.size = Pt(9); r.font.color.rgb = RGBColor.from_string(MID)
     add_image(doc, ASSETS / "dashboard.png", "Live dashboard overview captured from the ROC test deployment", width=5.7)
     callout(doc, "Scope", "This guide is for normal operation of the browser interface. Pi installation, receiver ownership, and recovery procedures are included for maintainers; browser screenshots show UI state only and do not by themselves prove antenna, decoder, or audio hardware health.", GREEN)
     doc.add_page_break()
@@ -259,7 +262,7 @@ def make_doc():
     doc.core_properties.title = "N0JCG Air Traffic Center User Guide"
     doc.core_properties.subject = "Branded end-user guide for the Raspberry Pi air traffic application"
     doc.core_properties.author = "N0JCG Open Radio Platform"
-    doc.core_properties.comments = "Version 1.0.0; screenshots captured from ROC test deployment on August 7, 2026."
+    doc.core_properties.comments = f"Version {GUIDE_VERSION}; screenshots captured from ROC test deployment on {CAPTURE_DATE}."
     cover(doc)
 
     doc.add_heading("At a glance", level=1)
@@ -267,12 +270,12 @@ def make_doc():
     table(doc, ["Item", "Value"], [
         ("Default browser URL", "http://<pi-lan-ip>:8090"),
         ("Service", "pi-air-traffic-tracker.service"),
-        ("Product version", "1.0.0"),
+        ("Product version", GUIDE_VERSION),
         ("Primary platform", "Raspberry Pi 5 / Linux"),
         ("Operating boundary", "Receive-only monitoring; not a navigation or safety-of-flight system"),
     ], [1.65, 4.85])
     doc.add_heading("Contents", level=1)
-    for item in ["1. Understand the dashboard", "2. Before you begin", "3. Open and validate the app", "4. Operate traffic and audio sources", "5. Use the aircraft detail view", "6. Weather radar and map controls", "7. Maintenance and recovery", "8. Operator checklist and limitations"]:
+    for item in ["1. Understand the dashboard", "2. Before you begin", "3. Open and validate the app", "4. Operate traffic and audio sources", "5. Registration and trial access", "6. Use the aircraft detail view", "7. Weather radar and map controls", "8. Maintenance and recovery", "9. Operator checklist and limitations"]:
         bullet(doc, item)
     callout(doc, "Quick start", "Open the browser URL, confirm the header status reads Audio Ready when audio is expected, check the traffic counters, and select an aircraft row to inspect its details. Use the menu for receiver controls and the ROC back button to return to the parent dashboard.", BLUE)
 
@@ -333,7 +336,21 @@ def make_doc():
     number(doc, "Use squelch and skip/block controls to manage the listening experience; the exact controls available depend on the current UI state.", airband_steps)
     callout(doc, "Expected result", "Audio readiness is explicit in the header/status area. An enabled control is not the same as confirmed RF reception; verify with the active state, service logs, and the connected audio path when troubleshooting.", GREEN)
 
-    doc.add_heading("5. Use the aircraft detail view", level=1)
+    doc.add_heading("5. Registration and trial access", level=1)
+    doc.add_paragraph("Unregistered installations include a manually restarted five-minute evaluation period. The trial controls aircraft tracking, NOAA Weather Radio, civil Airband scanning, and shared audio. When the timer expires, the backend stops those functions and the browser clears the aircraft list, map markers, and trails.")
+    doc.add_heading("Register the installation", level=2)
+    registration_steps = new_numbering_id(doc)
+    number(doc, "Open the menu and expand Registration.", registration_steps)
+    number(doc, "Enter the license S/N and the registered email address. The application trims the serial, converts it to uppercase, and normalizes the email before activation.", registration_steps)
+    number(doc, "Select Activate license and wait for the registration status to confirm success.", registration_steps)
+    number(doc, "After successful activation, the Restart Trial control is hidden and the licensed installation can continue operating without the trial timer.", registration_steps)
+    callout(doc, "Privacy and validation", "The browser submits only the license S/N and email to the local Pi endpoint. The backend adds the installation identity, product slug, and application version before contacting the N0JCG licensing service and verifies the signed lease before accepting it.", BLUE)
+    doc.add_heading("Restart the free trial", level=2)
+    bullet(doc, "For an unregistered installation, select Restart Trial in the header to begin another five-minute period manually.")
+    bullet(doc, "The button is intentionally not an automatic renewal and is unavailable after registration.")
+    bullet(doc, "If the trial expires, register the product or restart the trial before expecting aircraft or audio activity to resume.")
+
+    doc.add_heading("6. Use the aircraft detail view", level=1)
     doc.add_paragraph("Select an aircraft marker or active-aircraft row to open its detail card. The card presents the data currently available from decoded traffic and optional enrichment services.")
     add_image(doc, ASSETS / "aircraft-details.png", "Aircraft detail card: identity, route, position, and available enrichment")
     table(doc, ["Field group", "Meaning"], [
@@ -344,7 +361,7 @@ def make_doc():
     ], [1.75, 4.75])
     callout(doc, "Interpretation", "Missing route, photo, or registration data is not automatically a decoder failure. Treat decoded position and enrichment as separate data paths and use the live status/API when diagnosing gaps.", AMBER)
 
-    doc.add_heading("6. Weather radar and map controls", level=1)
+    doc.add_heading("7. Weather radar and map controls", level=1)
     doc.add_paragraph("Weather radar is a browser-side overlay and requires internet access from the browser. The application keeps the displayed frame visible while the next frame loads, so a slow network should not create a distracting blank or fade between frames.")
     bullet(doc, "Use the Weather Radar menu to enable the overlay and adjust opacity.")
     bullet(doc, "Use the map controls to pan and zoom without changing receiver configuration.")
@@ -352,7 +369,7 @@ def make_doc():
     bullet(doc, "If radar is unavailable while the map works, check browser internet access and external tile/radar availability before restarting the Pi service.")
     callout(doc, "Expected result", "The last usable radar frame remains visible during a normal frame transition. A browser or external tile failure may still prevent new frames from loading.", BLUE)
 
-    doc.add_heading("7. Maintenance and recovery", level=1)
+    doc.add_heading("8. Maintenance and recovery", level=1)
     doc.add_heading("Routine service commands", level=2)
     code(doc, "sudo systemctl restart pi-air-traffic-tracker.service\nsudo systemctl stop pi-air-traffic-tracker.service\nsudo systemctl start pi-air-traffic-tracker.service\nsudo journalctl -u pi-air-traffic-tracker.service -n 200 --no-pager")
     doc.add_heading("Common symptoms", level=2)
@@ -360,7 +377,7 @@ def make_doc():
         ("Receiver busy", "Check competing readsb/dump1090 services and USB ownership.", "Stop the conflicting service; keep the app-owned decoder as the owner."),
         ("No aircraft", "Check receiver_roles, antenna connection, decoder logs, and recent messages.", "Correct ownership/configuration, then restart the app service if needed."),
         ("No NOAA scan", "Confirm VHF antenna and serial 00000162; inspect USB claim errors.", "Stop other audio mode and retry after service health is confirmed."),
-        ("Radar blank", "Check browser internet and radar/tile availability.", "Refresh or disable/re-enable the overlay; do not change receiver settings."),
+        ("Radar blank", "Check browser internet and radar/tile availability.", "Refresh or toggle the overlay."),
     ], [1.3, 3.0, 2.2])
     doc.add_heading("Update workflow", level=2)
     update_steps = new_numbering_id(doc)
@@ -370,7 +387,7 @@ def make_doc():
     number(doc, "Open the browser URL and compare status, map, traffic list, and menu behavior.", update_steps)
     number(doc, "Record any receiver or audio validation separately from browser UI validation.", update_steps)
 
-    doc.add_heading("8. Operator checklist and limitations", level=1)
+    doc.add_heading("9. Operator checklist and limitations", level=1)
     doc.add_paragraph("Use this short checklist after a deployment, reboot, or significant configuration change.")
     for item in [
         "The browser opens at the current Pi LAN address on port 8090.",
@@ -389,9 +406,9 @@ def make_doc():
         ("Service", "pi-air-traffic-tracker.service"),
         ("API status", "http://127.0.0.1:8090/api/status on the Pi"),
         ("Detailed maintainer guide", "docs/PI_AIR_TRAFFIC_TRACKER_USER_GUIDE.md"),
-        ("Release scope", "docs/RELEASE_V1_0_0.md"),
+        ("Release scope", f"docs/RELEASE_V{GUIDE_VERSION.replace('.', '_')}.md"),
     ], [1.9, 4.6])
-    doc.add_paragraph("Screenshot note: the screenshots in this publication were captured from the ROC test deployment on August 7, 2026. Live traffic values, aircraft identities, radar frames, and enrichment results will change over time.")
+    doc.add_paragraph(f"Screenshot note: the screenshots in this publication were captured from the ROC test deployment on {CAPTURE_DATE}. Live traffic values, aircraft identities, radar frames, and enrichment results will change over time.")
     doc.save(DOCX_PATH)
     print(DOCX_PATH)
 
