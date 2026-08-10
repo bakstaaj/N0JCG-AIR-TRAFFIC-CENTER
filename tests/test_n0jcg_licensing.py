@@ -36,7 +36,7 @@ class AirTrafficLicensingTests(unittest.TestCase):
         expected_installation = installation_serial_from_identity("air-traffic-test-installation")
         with tempfile.TemporaryDirectory() as directory:
             client = LicenseClient(
-                product_slug="air-traffic",
+                product_slug="air-traffic-center",
                 app_version="1.0.0",
                 state_root=Path(directory),
                 environment={
@@ -54,7 +54,7 @@ class AirTrafficLicensingTests(unittest.TestCase):
         self.assertEqual(submitted["license_serial"], expected_license)
         self.assertEqual(submitted["email"], expected_email)
         self.assertEqual(submitted["installation_serial"], expected_installation)
-        self.assertEqual(submitted["product_slug"], "air-traffic")
+        self.assertEqual(submitted["product_slug"], "air-traffic-center")
         self.assertEqual(submitted["app_version"], "1.0.0")
         self.assertEqual(opener.request.get_header("User-agent"), "N0JCG-Air-Traffic/1.0.0")
         self.assertEqual(client.api_url, LICENSE_API_URL)
@@ -63,7 +63,7 @@ class AirTrafficLicensingTests(unittest.TestCase):
         opener = CapturingOpener()
         with tempfile.TemporaryDirectory() as directory:
             client = LicenseClient(
-                product_slug="air-traffic",
+                product_slug="air-traffic-center",
                 app_version="1.0.0",
                 state_root=Path(directory),
                 opener=opener,
