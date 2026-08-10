@@ -3615,7 +3615,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   const ENABLED_KEY = 'rtlAdsbWeatherRadarEnabledV1';
   const OPACITY_KEY = 'rtlAdsbWeatherRadarOpacityV1';
   const HISTORY_KEY = 'rtlAdsbWeatherRadarHistoryMinutesV1';
-  const SPEED_KEY = 'rtlAdsbWeatherRadarPlaybackSpeedV5';
+  const SPEED_KEY = 'rtlAdsbWeatherRadarPlaybackSpeedV6';
   const LOOP_KEY = 'rtlAdsbWeatherRadarLoopV1';
 
   const WEATHER_MAPS_URL = 'https://api.rainviewer.com/public/weather-maps.json';
@@ -3624,7 +3624,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   const MAX_OPACITY = 85;
   const DEFAULT_OPACITY = 45;
   const DEFAULT_HISTORY_MINUTES = 60;
-  const DEFAULT_SPEED_MS = 750;
+  const DEFAULT_SPEED_MS = 250;
   const NEWEST_FRAME_HOLD_MS = 15000;
   const MAX_NATIVE_ZOOM = 7;
 
@@ -3675,7 +3675,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
 
   function playbackSpeedMs() {
     const stored = Number(localStorage.getItem(SPEED_KEY) || DEFAULT_SPEED_MS);
-    return [450, 750, 1200].includes(stored) ? stored : DEFAULT_SPEED_MS;
+    return [250, 450, 750, 1200].includes(stored) ? stored : DEFAULT_SPEED_MS;
   }
 
   function playbackLoops() {
@@ -4105,7 +4105,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
     if (history) history.addEventListener('change', () => setHistory(history.value));
     if (speed) speed.addEventListener('change', () => {
       const parsed = Number(speed.value);
-      localStorage.setItem(SPEED_KEY, String([450, 750, 1200].includes(parsed) ? parsed : DEFAULT_SPEED_MS));
+      localStorage.setItem(SPEED_KEY, String([250, 450, 750, 1200].includes(parsed) ? parsed : DEFAULT_SPEED_MS));
       if (playbackRunning) {
         if (playbackTimer) window.clearTimeout(playbackTimer);
         playbackTimer = null;
