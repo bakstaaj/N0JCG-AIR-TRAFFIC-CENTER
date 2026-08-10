@@ -32,9 +32,9 @@ find tools deploy -type f -name '*.sh' -print0 | xargs -0 -r -n1 bash -n
 Hardware-dependent validation must run on the target Raspberry Pi. Local browser checks do not prove receiver, antenna, decoder, or live audio behavior.
 
 <!-- V1_0_RELEASE_BEGIN -->
-## v1.0.0 production release
+## v1.1.0 production release
 
-N0JCG AIR TRAFFIC CENTER v1.0.0 is the first full production release of the Raspberry Pi 5 aviation receiver application.
+N0JCG AIR TRAFFIC CENTER v1.1.0 is the current production release of the Raspberry Pi 5 aviation receiver application.
 
 | Production area | Status |
 | --- | --- |
@@ -51,7 +51,7 @@ N0JCG AIR TRAFFIC CENTER v1.0.0 is the first full production release of the Rasp
 
 Validated NOAA and Airband receiver settings use a 240 kHz RF input rate, 24 kHz audio, 49.6 dB RF gain, 0 PPM correction, offset tuning, and DC removal. NOAA adds FM deemphasis; Airband AM deliberately does not.
 
-See [`docs/RELEASE_V1_0_0.md`](docs/RELEASE_V1_0_0.md) for the complete release scope and acceptance baseline.
+See [`docs/RELEASE_V1_1_0.md`](docs/RELEASE_V1_1_0.md) for the current release scope and acceptance baseline. The original v1.0.0 release remains available as the first production baseline.
 <!-- V1_0_RELEASE_END -->
 
 ## Historical V0.1 initial Pi port checkpoint
