@@ -3631,6 +3631,10 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   let radarHost = '';
   let radarFrames = [];
   let radarLayer = null;
+  // Keep completed frame layers available for instant replay. The browser
+  // still owns the tile image cache; retaining the Leaflet layers also avoids
+  // rebuilding image requests while cycling through already-loaded history.
+  const radarLayerCache = new Map();
   let pendingRadarLayer = null;
   let radarTransitionId = 0;
   let currentFrameIndex = -1;
@@ -3723,6 +3727,25 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
   function frameTileUrl(frame) {
     if (!frame || !radarHost || !frame.path) return '';
     return `${radarHost}${frame.path}/256/{z}/{x}/{y}/2/1_1.png`;
+  }
+
+  function frameCacheKey(frame) {
+    return frame ? `${Number(frame.time)}:${String(frame.path || '')}` : '';
+  }
+
+  function createRadarLayer(frame, opacity) {
+    const layer = L.tileLayer(frameTileUrl(frame), {
+      pane: ensureRadarPane(mapInstance()),
+      opacity,
+      maxNativeZoom: MAX_NATIVE_ZOOM,
+      maxZoom: 19,
+      updateWhenIdle: false,
+      keepBuffer: 2,
+      crossOrigin: true,
+      attribution: 'Radar: RainViewer'
+    });
+    layer._rtpRadarFrameKey = frameCacheKey(frame);
+    return layer;
   }
 
   function ensureRadarLayer() {
@@ -3827,16 +3850,16 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
 
     const previousLayer = radarLayer;
     const targetOpacity = currentOpacity() / 100;
-    const nextLayer = L.tileLayer(frameTileUrl(frame), {
-      pane: ensureRadarPane(map),
-      opacity: previousLayer ? 0 : targetOpacity,
-      maxNativeZoom: MAX_NATIVE_ZOOM,
-      maxZoom: 19,
-      updateWhenIdle: false,
-      keepBuffer: 2,
-      crossOrigin: true,
-      attribution: 'Radar: RainViewer'
-    });
+    const frameKey = frameCacheKey(frame);
+    if (previousLayer && previousLayer._rtpRadarFrameKey === frameKey) {
+      currentFrameIndex = targetIndex;
+      updateControls();
+      if (announce) setRadarStatus(`Showing radar frame ${relativeFrameText(currentFrameIndex)}.`, 'good');
+      return Promise.resolve(true);
+    }
+
+    const cachedLayer = radarLayerCache.get(frameKey);
+    const nextLayer = cachedLayer || createRadarLayer(frame, previousLayer ? 0 : targetOpacity);
     pendingRadarLayer = nextLayer;
 
     return new Promise(resolve => {
@@ -3859,6 +3882,7 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
           try { if (map.hasLayer(previousLayer)) map.removeLayer(previousLayer); } catch (_) {}
         }
         radarLayer = nextLayer;
+        radarLayerCache.set(frameKey, nextLayer);
         pendingRadarLayer = null;
         currentFrameIndex = targetIndex;
         updateControls();
@@ -3869,8 +3893,14 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
       };
 
       try {
-        nextLayer.once('load', finishTransition);
         nextLayer.addTo(map);
+        if (cachedLayer) {
+          // A retained layer already completed its tile load. Reuse it without
+          // waiting for Leaflet to emit a second load event.
+          window.setTimeout(finishTransition, 0);
+        } else {
+          nextLayer.once('load', finishTransition);
+        }
       } catch (_) {
         if (pendingRadarLayer === nextLayer) pendingRadarLayer = null;
         resolve(false);
@@ -3973,6 +4003,12 @@ try{document.addEventListener("DOMContentLoaded",()=>setTimeout(rtpV34InstallAir
       radarHost = host.replace(/\/+$/, '');
       radarFrames = filterFrames(past);
       if (!radarFrames.length) throw new Error('No radar frames matched the selected history range.');
+      const validFrameKeys = new Set(radarFrames.map(frameCacheKey));
+      for (const [key, layer] of radarLayerCache) {
+        if (!validFrameKeys.has(key) && layer !== radarLayer && layer !== pendingRadarLayer) {
+          radarLayerCache.delete(key);
+        }
+      }
 
       if (settings.forceLatest || wasNewest || previousTime == null) {
         currentFrameIndex = radarFrames.length - 1;
