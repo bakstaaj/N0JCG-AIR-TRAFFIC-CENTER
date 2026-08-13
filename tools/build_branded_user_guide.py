@@ -16,6 +16,7 @@ BRAND = ROOT.parent / "N0JCG Website" / "website" / "assets" / "brand"
 GUIDE_VERSION = "1.1.1"
 GUIDE_SHORT_VERSION = "1.1"
 CAPTURE_DATE = "August 10, 2026"
+PUBLICATION_DATE = "August 12, 2026"
 DOCX_PATH = OUT / f"N0JCG_Air_Traffic_Center_User_Guide_v{GUIDE_SHORT_VERSION}.docx"
 
 NAVY = "0A1F44"
@@ -251,7 +252,7 @@ def cover(doc):
     p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER; p.paragraph_format.space_before = Pt(14); p.paragraph_format.space_after = Pt(4)
     r = p.add_run("Operate the map, traffic sources, weather radar, and receive-only aviation audio"); r.font.size = Pt(12); r.font.color.rgb = RGBColor.from_string(SLATE)
     p = doc.add_paragraph(); p.alignment = WD_ALIGN_PARAGRAPH.CENTER; p.paragraph_format.space_after = Pt(12)
-    r = p.add_run(f"Version {GUIDE_VERSION}  |  Status: Current release  |  Owner: N0JCG Open Radio Platform  |  {CAPTURE_DATE}"); r.font.size = Pt(9); r.font.color.rgb = RGBColor.from_string(MID)
+    r = p.add_run(f"Version {GUIDE_VERSION}  |  Status: Current release  |  Owner: N0JCG Open Radio Platform  |  {PUBLICATION_DATE}"); r.font.size = Pt(9); r.font.color.rgb = RGBColor.from_string(MID)
     add_image(doc, ASSETS / "dashboard.png", "Live dashboard overview captured from the ROC test deployment", width=5.7)
     callout(doc, "Scope", "This guide is for normal operation of the browser interface. Pi installation, receiver ownership, and recovery procedures are included for maintainers; browser screenshots show UI state only and do not by themselves prove antenna, decoder, or audio hardware health.", GREEN)
     doc.add_page_break()
@@ -262,7 +263,7 @@ def make_doc():
     doc.core_properties.title = "N0JCG Air Traffic Center User Guide"
     doc.core_properties.subject = "Branded end-user guide for the Raspberry Pi air traffic application"
     doc.core_properties.author = "N0JCG Open Radio Platform"
-    doc.core_properties.comments = f"Version {GUIDE_VERSION}; screenshots captured from ROC test deployment on {CAPTURE_DATE}."
+    doc.core_properties.comments = f"Version {GUIDE_VERSION}; publication updated {PUBLICATION_DATE}; screenshots captured from ROC test deployment on {CAPTURE_DATE}."
     cover(doc)
 
     doc.add_heading("At a glance", level=1)
@@ -275,7 +276,7 @@ def make_doc():
         ("Operating boundary", "Receive-only monitoring; not a navigation or safety-of-flight system"),
     ], [1.65, 4.85])
     doc.add_heading("Contents", level=1)
-    for item in ["1. Understand the dashboard", "2. Before you begin", "3. Open and validate the app", "4. Operate traffic and audio sources", "5. Registration and trial access", "6. Use the aircraft detail view", "7. Weather radar and map controls", "8. Maintenance and recovery", "9. Operator checklist and limitations"]:
+    for item in ["1. Understand the dashboard", "2. Getting started with a new Pi", "3. Before you begin", "4. Open and validate the app", "5. Operate traffic and audio sources", "6. Registration and trial access", "7. Use the aircraft detail view", "8. Weather radar and map controls", "9. Maintenance and recovery", "10. Operator checklist and limitations"]:
         bullet(doc, item)
     callout(doc, "Quick start", "Open the browser URL, confirm the header status reads Audio Ready when audio is expected, check the traffic counters, and select an aircraft row to inspect its details. Use the menu for receiver controls and the ROC back button to return to the parent dashboard.", BLUE)
 
@@ -290,7 +291,40 @@ def make_doc():
     ], [1.55, 4.95])
     callout(doc, "Expected result", "The page loads without a blank shell, the map has a usable base layer, and the status cards update as the backend publishes data.", GREEN)
 
-    doc.add_heading("2. Before you begin", level=1)
+    doc.add_heading("2. Getting started with a new Pi", level=1)
+    doc.add_paragraph("Use this section when preparing a new standalone N0JCG Air Traffic Center installation. The guided installer handles the software sequence, but the operator must prepare the Pi, connect the correct receivers and antennas, and identify the FlyCatcher paths before serial programming.")
+    doc.add_heading("Hardware checklist", level=2)
+    table(doc, ["Item", "Recommendation"], [
+        ("Raspberry Pi", "Raspberry Pi 5 with a reliable USB-C power supply and adequate cooling."),
+        ("SD card", "High-endurance 32 GB or larger card; use a quality card reader and verify the image before first boot."),
+        ("Network", "Ethernet is recommended for the initial setup and steady aircraft/audio operation. Wi-Fi can be used when Ethernet is unavailable."),
+        ("ADS-B / UAT receiver", "Nooelec FlyCatcher dual-tuner receiver with clearly identified ADS-B and UAT paths."),
+        ("NOAA / Airband receiver", "Nooelec NESDR Nano2+ for the shared 162 MHz NOAA and civil Airband path."),
+        ("USB accessories", "Powered USB hub if needed; keep the Pi power supply and receiver cabling physically secure."),
+    ], [1.55, 4.95])
+    doc.add_heading("Recommended antennas", level=2)
+    bullet(doc, "1090 MHz: a dedicated outdoor or window-mounted ADS-B antenna with low-loss coax and a clear view of the sky.")
+    bullet(doc, "978 MHz: a band-appropriate antenna or the FlyCatcher antenna path intended for UAT reception.")
+    bullet(doc, "162 MHz NOAA / civil Airband: a VHF antenna covering approximately 118-163 MHz, connected to the NESDR Nano2+.")
+    bullet(doc, "Keep antenna cables short where practical and label each cable with its receiver role before connecting USB devices.")
+    callout(doc, "Receive-only boundary", "This application only receives and displays aircraft and radio information. It does not transmit. Antenna placement, filtering, geography, and local RF conditions determine coverage and audio quality.", RED)
+    doc.add_heading("Prepare the Pi operating system", level=2)
+    os_steps = new_numbering_id(doc)
+    number(doc, "Use Raspberry Pi Imager to write the current 64-bit Raspberry Pi OS/Debian-family image to the SD card. Choose a Lite image for a headless appliance or a Desktop image if the Pi will have a local display.", os_steps)
+    number(doc, "In the Imager customization screen, set the hostname, create the Pi user, configure the network, set the time zone, and enable SSH using password authentication for the initial deployment.", os_steps)
+    number(doc, "Insert the SD card, connect Ethernet and power, and allow the Pi to complete its first boot.", os_steps)
+    number(doc, "From the workstation, confirm the Pi is reachable over SSH and keep all RTL-SDR receivers disconnected until the installer requests them.", os_steps)
+    doc.add_heading("Run the guided first deployment", level=2)
+    doc.add_paragraph("Run this from the MSYS2/UCRT64 terminal on the workstation containing the N0JCG Air Traffic Center repository:")
+    code(doc, "./tools/install_pi_initial_deployment.sh")
+    deploy_steps = new_numbering_id(doc)
+    number(doc, "Enter the Pi IP address, SSH user (normally pi), and SSH password. The launcher stores reusable values in a private local .env file.", deploy_steps)
+    number(doc, "Follow the prompts to insert only the named radio. The installer backs up its EEPROM, assigns the correct serial automatically, asks you to remove it, and verifies it once before continuing.", deploy_steps)
+    number(doc, "When prompted, reconnect all three receivers with their matching antennas. The installer validates the serial-to-role map before enabling the services.", deploy_steps)
+    number(doc, "After service and API validation pass, open http://<pi-ip-address>:8090 in a browser on the same LAN.", deploy_steps)
+    callout(doc, "Required serial map", "ADS-B 1090 uses 00001090; NOAA/Airband uses 00000162; UAT 978 uses 00000978. The installer uses stable EEPROM serials rather than transient Linux USB indexes.", BLUE)
+
+    doc.add_heading("3. Before you begin", level=1)
     doc.add_paragraph("The normal operator only needs a browser on the same LAN as the Pi. Maintainers working on the Pi should confirm the receiver labels and serials before starting or changing services.")
     table(doc, ["Role", "Receiver / source", "Permanent serial"], [
         ("NOAA / Airband", "Nooelec NESDR Nano2+; 162 MHz NFM and civil Airband AM", "00000162"),
@@ -304,7 +338,7 @@ def make_doc():
     bullet(doc, "The 978 MHz antenna belongs on the FlyCatcher UAT side assigned 00000978.")
     bullet(doc, "NOAA and Airband share 00000162 and cannot own that receiver simultaneously.")
 
-    doc.add_heading("3. Open and validate the app", level=1)
+    doc.add_heading("4. Open and validate the app", level=1)
     doc.add_heading("Open the browser interface", level=2)
     doc.add_paragraph("Use the current LAN address of the Pi. The default port is 8090.")
     code(doc, "http://<pi-lan-ip>:8090")
@@ -318,7 +352,7 @@ def make_doc():
     bullet(doc, "If the service is active but the UI is empty, inspect the service journal and receiver ownership before changing browser settings.")
     callout(doc, "Recovery", "A browser refresh is safe for a stale page. A service restart is an administrative action and can interrupt active receiver and audio sessions; use it only when the service or backend requires recovery.", AMBER)
 
-    doc.add_heading("4. Operate traffic and audio sources", level=1)
+    doc.add_heading("5. Operate traffic and audio sources", level=1)
     doc.add_heading("Use the operator menu", level=2)
     doc.add_paragraph("Select the menu button in the header. The drawer groups operational controls below the app identity and keeps the map visible behind a dimmed backdrop.")
     add_image(doc, ASSETS / "operator-menu.png", "Operator menu: navigation, user guide link, audio controls, receiver location, and traffic sources")
@@ -336,7 +370,7 @@ def make_doc():
     number(doc, "Use squelch and skip/block controls to manage the listening experience; the exact controls available depend on the current UI state.", airband_steps)
     callout(doc, "Expected result", "Audio readiness is explicit in the header/status area. An enabled control is not the same as confirmed RF reception; verify with the active state, service logs, and the connected audio path when troubleshooting.", GREEN)
 
-    doc.add_heading("5. Registration and trial access", level=1)
+    doc.add_heading("6. Registration and trial access", level=1)
     doc.add_paragraph("Unregistered installations include a manually restarted five-minute evaluation period. The trial controls aircraft tracking, NOAA Weather Radio, civil Airband scanning, and shared audio. When the timer expires, the backend stops those functions and the browser clears the aircraft list, map markers, and trails.")
     doc.add_heading("Register the installation", level=2)
     registration_steps = new_numbering_id(doc)
@@ -350,7 +384,7 @@ def make_doc():
     bullet(doc, "The button is intentionally not an automatic renewal and is unavailable after registration.")
     bullet(doc, "If the trial expires, register the product or restart the trial before expecting aircraft or audio activity to resume.")
 
-    doc.add_heading("6. Use the aircraft detail view", level=1)
+    doc.add_heading("7. Use the aircraft detail view", level=1)
     doc.add_paragraph("Select an aircraft marker or active-aircraft row to open its detail card. The card presents the data currently available from decoded traffic and optional enrichment services.")
     add_image(doc, ASSETS / "aircraft-details.png", "Aircraft detail card: identity, route, position, and available enrichment")
     table(doc, ["Field group", "Meaning"], [
@@ -361,7 +395,7 @@ def make_doc():
     ], [1.75, 4.75])
     callout(doc, "Interpretation", "Missing route, photo, or registration data is not automatically a decoder failure. Treat decoded position and enrichment as separate data paths and use the live status/API when diagnosing gaps.", AMBER)
 
-    doc.add_heading("7. Weather radar and map controls", level=1)
+    doc.add_heading("8. Weather radar and map controls", level=1)
     doc.add_paragraph("Weather radar is a browser-side overlay and requires internet access from the browser. The application keeps the displayed frame visible while the next frame loads, so a slow network should not create a distracting blank or fade between frames.")
     bullet(doc, "Use the Weather Radar menu to enable the overlay and adjust opacity.")
     bullet(doc, "Use the map controls to pan and zoom without changing receiver configuration.")
@@ -369,7 +403,7 @@ def make_doc():
     bullet(doc, "If radar is unavailable while the map works, check browser internet access and external tile/radar availability before restarting the Pi service.")
     callout(doc, "Expected result", "The last usable radar frame remains visible during a normal frame transition. A browser or external tile failure may still prevent new frames from loading.", BLUE)
 
-    doc.add_heading("8. Maintenance and recovery", level=1)
+    doc.add_heading("9. Maintenance and recovery", level=1)
     doc.add_heading("Routine service commands", level=2)
     code(doc, "sudo systemctl restart pi-air-traffic-tracker.service\nsudo systemctl stop pi-air-traffic-tracker.service\nsudo systemctl start pi-air-traffic-tracker.service\nsudo journalctl -u pi-air-traffic-tracker.service -n 200 --no-pager")
     doc.add_heading("Common symptoms", level=2)
@@ -387,7 +421,7 @@ def make_doc():
     number(doc, "Open the browser URL and compare status, map, traffic list, and menu behavior.", update_steps)
     number(doc, "Record any receiver or audio validation separately from browser UI validation.", update_steps)
 
-    doc.add_heading("9. Operator checklist and limitations", level=1)
+    doc.add_heading("10. Operator checklist and limitations", level=1)
     doc.add_paragraph("Use this short checklist after a deployment, reboot, or significant configuration change.")
     for item in [
         "The browser opens at the current Pi LAN address on port 8090.",

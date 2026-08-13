@@ -3,7 +3,7 @@
 **Platform:** Raspberry Pi 5 running Debian/Raspberry Pi OS Trixie  
 **Application service:** `pi-air-traffic-tracker.service`  
 **Default web port:** `8090`  
-**Guide revision:** July 31, 2026
+**Guide revision:** August 12, 2026
 
 ## 1. Scope
 
@@ -16,6 +16,68 @@ The three receiver roles covered here are:
 - UAT aircraft reception on 978 MHz.
 
 This guide does **not** cover configuring these receivers for any other scanner, radio, SDR, or decoder application. Those applications have their own documentation. Do not run another SDR application against these receivers while N0JCG AIR TRAFFIC CENTER is active.
+
+## Getting started with a new Pi
+
+Use this dedicated section when building a new standalone N0JCG Air Traffic Center installation from an empty SD card. The guided installer performs the software setup and validation, while the operator prepares the Pi, connects the radios, and follows the one-at-a-time serial prompts.
+
+### Hardware needed
+
+- Raspberry Pi 5 with a reliable USB-C power supply and adequate cooling.
+- High-endurance 32 GB or larger microSD card and a quality card reader.
+- Ethernet cable for the initial setup and recommended normal operation. Wi-Fi is supported when Ethernet is unavailable.
+- Nooelec FlyCatcher dual-tuner receiver with its ADS-B and UAT paths physically identified.
+- Nooelec NESDR Nano2+ for the shared NOAA Weather Radio and civil Airband receiver path.
+- Powered USB hub when the Pi power budget or cable layout requires one.
+- Band-appropriate antennas, coax, and labels for each receiver path.
+
+### Recommended antenna arrangement
+
+- 1090 MHz: dedicated outdoor or window-mounted ADS-B antenna with low-loss coax and a clear sky view.
+- 978 MHz: a band-appropriate antenna or the FlyCatcher path intended for UAT reception.
+- 118-163 MHz: a VHF antenna covering civil Airband and NOAA Weather Radio, connected to the NESDR Nano2+.
+
+Label the cables before inserting the radios. Connect each antenna to the matching receiver role; do not use USB order as a role identifier.
+
+### Load the Pi operating system
+
+1. Use Raspberry Pi Imager to write the current 64-bit Raspberry Pi OS/Debian-family image to the SD card. Use Lite for a headless appliance or Desktop if the Pi will have a local display.
+2. In the Imager customization screen, set the hostname, create the Pi user, configure the network and time zone, and enable SSH using password authentication for the initial deployment.
+3. Insert the card, connect Ethernet and power, and allow the Pi to complete its first boot.
+4. Confirm the Pi is reachable over SSH from the workstation. Keep all RTL-SDR receivers disconnected until the installer requests them.
+
+### Run the guided installer
+
+From an MSYS2/UCRT64 terminal on the workstation containing this repository, run:
+
+```bash
+./tools/install_pi_initial_deployment.sh
+```
+
+The launcher prompts for the Pi IP address, SSH user (normally `pi`), and SSH password, then stores reusable values in a private local `.env` file. The file contains the password and must not be committed or shared.
+
+For each radio, follow the exact prompt sequence:
+
+1. Insert only the named radio, such as “Insert the ADS-B radio”.
+2. The installer confirms that one RTL-SDR is connected, backs up its EEPROM, and assigns the correct serial automatically.
+3. Remove the radio when instructed.
+4. Reinsert it once for automatic verification, then remove it again before the next role.
+
+The required serial assignments are:
+
+| Radio role | Required serial |
+| --- | --- |
+| ADS-B / FlyCatcher ADS-B path | `00001090` |
+| NOAA/Airband / NESDR Nano2+ | `00000162` |
+| UAT / FlyCatcher UAT path | `00000978` |
+
+After all three radios are programmed, reconnect them with their antennas. The installer validates the serial-role map, installs the app-owned decoders and services, starts the Pi web/API service, and runs the final checks. When it reports success, open:
+
+```text
+http://<pi-ip-address>:8090
+```
+
+If the FlyCatcher ADS-B and UAT paths cannot be positively identified, stop. Do not assign their roles by Linux device index.
 
 ## 2. Hardware and permanent receiver names
 

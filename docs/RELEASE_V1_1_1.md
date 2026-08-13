@@ -6,6 +6,7 @@
 ## Included changes
 
 - Branded end-user guide refreshed for the current application release.
+- Branded guide now includes a dedicated new-Pi getting-started section covering the SD card/OS load, RTL hardware, antenna arrangement, and guided installer workflow.
 - User guide now documents registration, signed license activation, manual five-minute trial restart, and trial-expiry cleanup.
 - Updated DOCX and PDF publications are linked by the local web UI and published with the website documentation assets.
 - v1.1.0 licensing, trial, no-radio resilience, and aircraft-map cleanup behavior remains included.
