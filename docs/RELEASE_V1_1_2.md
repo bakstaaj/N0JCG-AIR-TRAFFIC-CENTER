@@ -1,6 +1,6 @@
 # N0JCG Air Traffic Center v1.1.2
 
-**Release type:** First-deployment installer release  
+**Release type:** First-deployment installer release
 **Repository:** `bakstaaj/N0JCG-AIR-TRAFFIC-CENTER`
 
 ## Included changes
