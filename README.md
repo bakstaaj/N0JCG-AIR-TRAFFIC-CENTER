@@ -31,6 +31,26 @@ find tools deploy -type f -name '*.sh' -print0 | xargs -0 -r -n1 bash -n
 
 Hardware-dependent validation must run on the target Raspberry Pi. Local browser checks do not prove receiver, antenna, decoder, or live audio behavior.
 
+## New Pi first deployment
+
+From MSYS2/UCRT64 on the workstation, run the interactive first-deployment launcher from this repository:
+
+```bash
+./tools/install_pi_initial_deployment.sh
+```
+
+The launcher prompts for the Pi IP address, SSH user, and password, then saves reusable values in a local `.env` file with mode `600`. The file is ignored by Git and must remain private. The workflow uploads the committed application revision into `/home/<pi-user>/n0jcg-air-traffic-center`, installs the Debian/Raspberry Pi OS components, app-owned RTL decoders, and systemd units, and walks through programming each RTL-SDR EEPROM serial with only one receiver connected at a time.
+
+The installer validates the three required roles before starting the web service:
+
+| Role | EEPROM serial |
+| --- | --- |
+| ADS-B 1090 / FlyCatcher ADS-B | `00001090` |
+| NOAA/Airband 162 / NESDR Nano2+ | `00000162` |
+| UAT 978 / FlyCatcher UAT | `00000978` |
+
+After final service and API validation, open `http://<pi-ip-address>:8090` in a browser on the same LAN. The launcher requires `sshpass`, `ssh`, `scp`, `tar`, and `git` in MSYS2; use `scp -O` compatibility mode as provided by the script.
+
 <!-- V1_0_RELEASE_BEGIN -->
 ## v1.1.1 production release
 
