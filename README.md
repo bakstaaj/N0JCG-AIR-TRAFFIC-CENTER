@@ -52,9 +52,9 @@ The installer validates the three required roles before starting the web service
 After final service and API validation, open `http://<pi-ip-address>:8090` in a browser on the same LAN. The launcher requires `sshpass`, `ssh`, `scp`, `tar`, and `git` in MSYS2; use `scp -O` compatibility mode as provided by the script.
 
 <!-- V1_0_RELEASE_BEGIN -->
-## v1.1.1 production release
+## v1.1.2 production release
 
-N0JCG AIR TRAFFIC CENTER v1.1.1 is the current production release of the Raspberry Pi 5 aviation receiver application.
+N0JCG AIR TRAFFIC CENTER v1.1.2 is the current production release of the Raspberry Pi 5 aviation receiver application.
 
 | Production area | Status |
 | --- | --- |
@@ -71,7 +71,7 @@ N0JCG AIR TRAFFIC CENTER v1.1.1 is the current production release of the Raspber
 
 Validated NOAA and Airband receiver settings use a 240 kHz RF input rate, 24 kHz audio, 49.6 dB RF gain, 0 PPM correction, offset tuning, and DC removal. NOAA adds FM deemphasis; Airband AM deliberately does not.
 
-See [`docs/RELEASE_V1_1_1.md`](docs/RELEASE_V1_1_1.md) for the current release scope and acceptance baseline. The original v1.0.0 release remains available as the first production baseline.
+See [`docs/RELEASE_V1_1_2.md`](docs/RELEASE_V1_1_2.md) for the current release scope and acceptance baseline. The original v1.0.0 release remains available as the first production baseline.
 <!-- V1_0_RELEASE_END -->
 
 ## Historical V0.1 initial Pi port checkpoint
