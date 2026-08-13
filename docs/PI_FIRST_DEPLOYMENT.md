@@ -30,12 +30,12 @@ The installer is intentionally interactive because receiver identity cannot be i
 
 For each receiver, the installer asks you to:
 
-1. Disconnect every other RTL-SDR.
-2. Connect only the receiver for the named role.
-3. Confirm the physical product/board path shown by `rtl_test -t` and `rtl_eeprom`.
-4. Allow an EEPROM backup to be saved under `runtime/preflight/serial-backups/`.
-5. Type `PROGRAM` before the serial is written.
-6. Disconnect/reconnect that receiver and confirm the new serial.
+1. Insert only the receiver for the named role, such as “Insert the ADS-B radio”.
+2. Confirm that exactly one RTL-SDR is connected.
+3. Allow an EEPROM backup to be saved under `runtime/preflight/serial-backups/`.
+4. Automatically write the correct role serial; no serial typing is required.
+5. Remove the radio, then reinsert it once for automatic post-write verification.
+6. Remove it again before the installer advances to the next radio.
 
 The roles are performed in this order:
 

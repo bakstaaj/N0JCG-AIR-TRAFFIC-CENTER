@@ -41,34 +41,39 @@ section "Install operating-system components"
 section "Program RTL-SDR serial numbers one receiver at a time"
 printf '%s\n' \
   'Safety: disconnect every RTL-SDR except the receiver currently being programmed.' \
-  'The workflow uses device index 0 only after you confirm that one receiver is connected.' \
+  'The workflow uses device index 0 only after it confirms that one receiver is connected.' \
   'Never guess between the two FlyCatcher paths; use the board labels and antenna role.'
 
 program_role() {
-  local role="$1" serial="$2" backup="$3" confirmation current
+  local prompt="$1" role="$2" serial="$3" backup="$4" inventory
   printf '\n--- %s -> serial %s ---\n' "$role" "$serial"
-  read -r -p "Connect only the $role receiver, then press Enter. " _
-  rtl_test -t || fail "rtl_test could not enumerate the $role receiver"
+  read -r -p "Insert the $prompt, then press Enter. " _
+  inventory="$(rtl_test -t 2>&1 || true)"
+  printf '%s\n' "$inventory" | sed -n '1,18p'
+  if [[ "$(printf '%s\n' "$inventory" | grep -Ec 'SN:[[:space:]]*[^[:space:]]+')" -ne 1 ]]; then
+    fail "expected exactly one connected RTL receiver for $role; remove all other RTL radios and retry"
+  fi
   mkdir -p runtime/preflight/serial-backups
   sudo rtl_eeprom -d 0 -r "runtime/preflight/serial-backups/$backup" || fail "EEPROM backup failed for $role"
   printf 'EEPROM backup saved: runtime/preflight/serial-backups/%s\n' "$backup"
-  current="$(rtl_eeprom -d 0 2>&1 || true)"
-  printf '%s\n' "$current" | sed -n '1,18p'
-  read -r -p "Type PROGRAM to write serial $serial to this confirmed $role receiver: " confirmation
-  [[ "$confirmation" == PROGRAM ]] || fail "serial programming cancelled for $role"
-  sudo rtl_eeprom -d 0 -s "$serial" || fail "serial write failed for $role"
-  printf '%s\n' 'Disconnect/reconnect this receiver, keep the other receivers disconnected, then press Enter.'
+  printf 'Assigning serial %s automatically...\n' "$serial"
+  printf 'y\n' | sudo rtl_eeprom -d 0 -s "$serial" || fail "serial write failed for $role"
+  printf '%s\n' "Remove the $prompt now, then press Enter to continue to the next radio."
+  read -r _
+  printf '%s\n' "Insert the $prompt again to verify serial $serial, then press Enter."
   read -r _
   rtl_test -t | tee "runtime/preflight/${role//[^A-Za-z0-9]/_}_after_write.txt"
   if ! grep -q "SN: $serial" "runtime/preflight/${role//[^A-Za-z0-9]/_}_after_write.txt"; then
     fail "$role did not report expected serial $serial after write"
   fi
   pass "$role reports serial $serial"
+  printf '%s\n' "Remove the $prompt before continuing."
+  read -r _
 }
 
-program_role "ADS-B 1090 / FlyCatcher ADS-B side" 00001090 adsb_1090_eeprom_before.bin
-program_role "NOAA/Airband 162 / NESDR Nano2+" 00000162 noaa_airband_eeprom_before.bin
-program_role "UAT 978 / FlyCatcher UAT side" 00000978 uat_978_eeprom_before.bin
+program_role "ADS-B radio" "ADS-B 1090 / FlyCatcher ADS-B side" 00001090 adsb_1090_eeprom_before.bin
+program_role "NOAA/Airband radio" "NOAA/Airband 162 / NESDR Nano2+" 00000162 noaa_airband_eeprom_before.bin
+program_role "UAT radio" "UAT 978 / FlyCatcher UAT side" 00000978 uat_978_eeprom_before.bin
 
 section "Reconnect all receivers and validate roles before service startup"
 printf '%s\n' 'Reconnect all three receivers, confirm their antennas, and press Enter.'
