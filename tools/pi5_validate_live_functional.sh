@@ -140,7 +140,7 @@ except Exception as exc:
 
 if status_payload:
     roles = status_payload.get("receiver_roles") or {}
-    expected = {"adsb": "00001090", "audio": "00000162", "uat": "00000978"}
+    expected = {"adsb": "00001090", "audio": "00000162", "airband": "00000118", "uat": "00000978"}
     for key, serial in expected.items():
         role = roles.get(key) or {}
         if str(role.get("serial")) == serial:

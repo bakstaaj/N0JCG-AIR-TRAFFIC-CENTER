@@ -29,6 +29,7 @@ pass "installed committed revision $SOURCE_REVISION into $APP_ROOT"
 cd "$APP_ROOT"
 export PI_AIR_TRAFFIC_ADSB_SERIAL=00001090
 export PI_AIR_TRAFFIC_AUDIO_SERIAL=00000162
+export PI_AIR_TRAFFIC_AIRBAND_SERIAL=00000118
 export PI_AIR_TRAFFIC_UAT_SERIAL=00000978
 export PI_AIR_TRAFFIC_WEB_HOST=0.0.0.0
 export PI_AIR_TRAFFIC_WEB_PORT=8090
@@ -72,11 +73,12 @@ program_role() {
 }
 
 program_role "ADS-B radio" "ADS-B 1090 / FlyCatcher ADS-B side" 00001090 adsb_1090_eeprom_before.bin
-program_role "NOAA/Airband radio" "NOAA/Airband 162 / NESDR Nano2+" 00000162 noaa_airband_eeprom_before.bin
+program_role "NOAA Weather radio" "NOAA 162 / NESDR Nano2+" 00000162 noaa_eeprom_before.bin
+program_role "Airband radio" "Civil Airband / dedicated RTL receiver" 00000118 airband_eeprom_before.bin
 program_role "UAT radio" "UAT 978 / FlyCatcher UAT side" 00000978 uat_978_eeprom_before.bin
 
 section "Reconnect all receivers and validate roles before service startup"
-printf '%s\n' 'Reconnect all three receivers, confirm their antennas, and press Enter.'
+printf '%s\n' 'Reconnect all four receivers, confirm their antennas, and press Enter.'
 read -r _
 ./tools/pi5_validate_receiver_serial_mapping.sh || fail "receiver serial mapping validation failed"
 [[ -f runtime/settings/pi_air_traffic_hardware_roles.detected.json ]] || fail "detected role mapping JSON was not created"

@@ -33,4 +33,4 @@ Generated reports, runtime logs, captures, local patch backups, and temporary ch
 5. Deploy the scoped web/runtime assets to a test host only after validation.
 6. Compare served assets with the repository copy and record the relevant smoke result.
 
-Do not commit API keys, receiver runtime indexes, generated aircraft data, audio captures, logs, or local deployment credentials. Resolve receiver roles by EEPROM serial: NOAA/Airband `00000162`, ADS-B 1090 `00001090`, and UAT 978 `00000978`.
+Do not commit API keys, receiver runtime indexes, generated aircraft data, audio captures, logs, or local deployment credentials. Resolve receiver roles by EEPROM serial: NOAA `00000162`, Airband `00000118`, ADS-B 1090 `00001090`, and UAT 978 `00000978`.

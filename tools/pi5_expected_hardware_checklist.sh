@@ -88,7 +88,7 @@ Manual notes to fill in after reviewing this file:
 4. Are serial numbers already unique and useful?
 5. If serials are duplicated/default, should we set explicit serials before service work?
 6. Is ADS-B 1090 service allowed to own its device continuously?
-7. Should NOAA/Airband remain single-device shared mode for the first milestone?
+7. Confirm NOAA and Airband use separate receivers: 00000162 and 00000118.
 EOF_REPORT
 
 info "report written: $report"

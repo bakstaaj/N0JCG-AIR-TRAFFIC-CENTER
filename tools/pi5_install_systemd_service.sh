@@ -14,6 +14,7 @@ WEB_HOST="${PI_AIR_TRAFFIC_WEB_HOST:-0.0.0.0}"
 WEB_PORT="${PI_AIR_TRAFFIC_WEB_PORT:-8090}"
 ADSB_SERIAL="${PI_AIR_TRAFFIC_ADSB_SERIAL:-00001090}"
 AUDIO_SERIAL="${PI_AIR_TRAFFIC_AUDIO_SERIAL:-00000162}"
+AIRBAND_SERIAL="${PI_AIR_TRAFFIC_AIRBAND_SERIAL:-00000118}"
 UAT_SERIAL="${PI_AIR_TRAFFIC_UAT_SERIAL:-00000978}"
 
 pass() { echo "PASS: $*" | tee -a "$REPORT_PATH"; PASS_COUNT=$((PASS_COUNT + 1)); }
@@ -75,6 +76,7 @@ done
 if rtl_test -t > "runtime/preflight/pi5_systemd_install_rtl_test_${STAMP}.txt" 2>&1; then
   if grep -q "SN: ${ADSB_SERIAL}" "runtime/preflight/pi5_systemd_install_rtl_test_${STAMP}.txt" && \
      grep -q "SN: ${AUDIO_SERIAL}" "runtime/preflight/pi5_systemd_install_rtl_test_${STAMP}.txt" && \
+     grep -q "SN: ${AIRBAND_SERIAL}" "runtime/preflight/pi5_systemd_install_rtl_test_${STAMP}.txt" && \
      grep -q "SN: ${UAT_SERIAL}" "runtime/preflight/pi5_systemd_install_rtl_test_${STAMP}.txt"; then
     pass "expected receiver serials visible"
   else
@@ -125,6 +127,7 @@ Environment=RTL_ADSB_TRACKER_ROOT=${APP_ROOT}
 Environment=RTL_ADSB_TRACKER_RUNTIME=${APP_ROOT}/runtime
 Environment=PI_AIR_TRAFFIC_ADSB_SERIAL=${ADSB_SERIAL}
 Environment=PI_AIR_TRAFFIC_AUDIO_SERIAL=${AUDIO_SERIAL}
+Environment=PI_AIR_TRAFFIC_AIRBAND_SERIAL=${AIRBAND_SERIAL}
 Environment=PI_AIR_TRAFFIC_UAT_SERIAL=${UAT_SERIAL}
 Environment=PATH=${APP_ROOT}/runtime/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/usr/bin/python3 ${APP_ROOT}/src/backend/pi_air_traffic_backend.py --host ${WEB_HOST} --port ${WEB_PORT} --autostart --foreground-log --log-file ${APP_ROOT}/runtime/logs/pi_air_traffic_tracker_service.log --log-level INFO

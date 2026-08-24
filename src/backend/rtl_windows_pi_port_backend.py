@@ -49,6 +49,7 @@ from faa_airband_catalog import AirbandCatalog
 from rtl_windows_backend import (
     ADSB_SERIAL,
     AUDIO_SERIAL,
+    AIRBAND_SERIAL,
     AIRBAND_LIVE_AUDIO_PROFILE,
     NOAA_PROFILE,
     AudioManager,
@@ -95,8 +96,8 @@ AIRBAND_NORMAL_SCANNER_SQUELCH_V1 = True
 AIRBAND_OPEN_SQUELCH_AUDIO_V1 = True
 
 # PI_SHARED_AUDIO_SDR_HARDENING_V1:
-# NOAA live audio, Airband live hold audio, and Airband fast-spectrum scans
-# all share the same physical NOAA/Airband RTL-SDR. On Raspberry Pi, librtlsdr
+# NOAA live audio uses the NOAA RTL-SDR; Airband live/capture and fast-spectrum
+# scans use the dedicated Airband RTL-SDR. On Raspberry Pi, librtlsdr
 # can need a short settle interval after rtl_fm exits before rtl_power can
 # claim the interface. Prefer EEPROM serial selection over runtime index and
 # retry transient usb_claim failures before declaring the scanner stopped.
@@ -482,7 +483,9 @@ class AudioOperations:
         with self.lock:
             if self.noaa_live_active or self.audio.live_is_running() or self.audio.is_running():
                 raise RuntimeError("Audio receiver is already in use.")
-            self.audio._start_live_process(dict(profile), channel)
+            serial = AIRBAND_SERIAL if channel is not None else AUDIO_SERIAL
+            role_name = "airband" if channel is not None else "audio"
+            self.audio._start_live_process(dict(profile), channel, serial, role_name)
             sequence = 0
             pcm_parts: list[bytes] = []
             rate = int(profile["sample_rate_hz"])
@@ -583,7 +586,7 @@ class AudioOperations:
             profile["frequency_hz"] = int(channel["frequency_hz"])
             profile["rtl_fm_mode"] = "am"
             profile["gain_db"] = float(gain_db)
-            result = self.audio._start_live_process(profile, channel)
+            result = self.audio._start_live_process(profile, channel, AIRBAND_SERIAL, "airband")
             self.airband_live_active = True
             return result
 
@@ -633,7 +636,7 @@ class AudioOperations:
             csv_path.unlink(missing_ok=True)
             log_path.unlink(missing_ok=True)
 
-            device_candidates: list[str] = [AUDIO_SERIAL]
+            device_candidates: list[str] = [AIRBAND_SERIAL]
             index_text = str(index)
             if index_text not in device_candidates:
                 device_candidates.append(index_text)
@@ -751,7 +754,7 @@ class AudioOperations:
                 high_hz / 1_000_000,
                 time.monotonic() - started,
                 len(rows),
-                last_command[2] if last_command and len(last_command) > 2 else AUDIO_SERIAL,
+                last_command[2] if last_command and len(last_command) > 2 else AIRBAND_SERIAL,
             )
             return rows
 
@@ -2327,6 +2330,7 @@ class PiPortHandler(BaseHTTPRequestHandler):
             "audio_mode": "noaa_live" if live_noaa else "idle",
             "live_audio_running": live_noaa,
             "audio_receiver_serial": AUDIO_SERIAL,
+            "airband_receiver_serial": AIRBAND_SERIAL,
             "noaa_station": self.settings.noaa_station,
             "noaa_frequency_hz": self.settings.noaa_frequency_hz,
             "configured_noaa_station": "Validated local NOAA channel",

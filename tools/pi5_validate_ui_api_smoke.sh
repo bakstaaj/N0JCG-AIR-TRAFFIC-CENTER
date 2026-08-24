@@ -45,6 +45,7 @@ if [[ -x runtime/bin/readsb ]]; then pass "app-owned readsb executable exists: r
 if rtl_test -t > "runtime/preflight/pi5_ui_api_smoke_rtl_test_${STAMP}.txt" 2>&1; then
   if grep -q 'SN: 00001090' "runtime/preflight/pi5_ui_api_smoke_rtl_test_${STAMP}.txt" && \
      grep -q 'SN: 00000162' "runtime/preflight/pi5_ui_api_smoke_rtl_test_${STAMP}.txt" && \
+     grep -q 'SN: 00000118' "runtime/preflight/pi5_ui_api_smoke_rtl_test_${STAMP}.txt" && \
      grep -q 'SN: 00000978' "runtime/preflight/pi5_ui_api_smoke_rtl_test_${STAMP}.txt"; then
     pass "expected receiver serials visible to rtl_test"
   else
@@ -112,7 +113,7 @@ for _ in range(60):
         status, content_type, body = get("/api/status")
         payload = json.loads(body.decode("utf-8"))
         roles = payload.get("receiver_roles") or {}
-        expected = {"adsb": "00001090", "audio": "00000162", "uat": "00000978"}
+        expected = {"adsb": "00001090", "audio": "00000162", "airband": "00000118", "uat": "00000978"}
         for key, serial in expected.items():
             role = roles.get(key) or {}
             if str(role.get("serial")) != serial:

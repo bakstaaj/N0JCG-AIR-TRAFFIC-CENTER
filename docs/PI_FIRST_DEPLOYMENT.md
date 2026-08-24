@@ -42,7 +42,8 @@ The roles are performed in this order:
 | Role | Required EEPROM serial |
 | --- | --- |
 | ADS-B 1090 / FlyCatcher ADS-B side | `00001090` |
-| NOAA/Airband 162 / NESDR Nano2+ | `00000162` |
+| NOAA Weather Radio / NESDR Nano2+ | `00000162` |
+| Civil Airband / dedicated RTL receiver | `00000118` |
 | UAT 978 / FlyCatcher UAT side | `00000978` |
 
 Use the physical FlyCatcher labels and antenna path to distinguish its ADS-B and UAT sides. If the two sides cannot be positively distinguished, stop the installer rather than assigning serials by device index.

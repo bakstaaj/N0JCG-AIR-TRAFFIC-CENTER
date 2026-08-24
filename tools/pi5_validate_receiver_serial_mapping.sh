@@ -80,7 +80,8 @@ for match in pattern.finditer(text):
     })
 
 expected = {
-    "noaa_airband": "00000162",
+    "noaa": "00000162",
+    "airband": "00000118",
     "adsb_1090": "00001090",
     "uat_978": "00000978",
 }
@@ -100,7 +101,7 @@ for role, serial in expected.items():
     }
 
 payload = {
-    "ok": not missing and not duplicate_serials and len(devices) >= 3,
+    "ok": not missing and not duplicate_serials and len(devices) >= 4,
     "schema_version": 2,
     "generated_from": str(report_path),
     "mapping_strategy": "resolve_runtime_index_from_rtl_serial",

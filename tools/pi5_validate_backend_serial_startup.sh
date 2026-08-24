@@ -91,6 +91,7 @@ while time.time() < deadline:
         expected = {
             "adsb": "00001090",
             "audio": "00000162",
+            "airband": "00000118",
             "uat": "00000978",
         }
         for key, serial in expected.items():

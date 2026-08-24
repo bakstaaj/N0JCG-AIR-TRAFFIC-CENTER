@@ -15,9 +15,9 @@ The public product name is **N0JCG Air Traffic Center**. The canonical GitHub re
 ## Documentation and validation
 
 - [Air Traffic Center user guide](docs/PI_AIR_TRAFFIC_TRACKER_USER_GUIDE.md)
-- [Branded end-user guide (DOCX)](docs/publications/N0JCG_Air_Traffic_Center_User_Guide_v1.1.docx)
-- [Branded end-user guide (PDF)](docs/publications/N0JCG_Air_Traffic_Center_User_Guide_v1.1.pdf)
-- [Release and acceptance scope](docs/RELEASE_V1_1_1.md)
+- [Branded end-user guide (DOCX)](docs/publications/N0JCG_Air_Traffic_Center_User_Guide_v1.1.3.docx)
+- [Branded end-user guide (PDF)](docs/publications/N0JCG_Air_Traffic_Center_User_Guide_v1.1.3.pdf)
+- [Release and acceptance scope](docs/RELEASE_V1_1_3.md)
 - [Development guardrails](docs/DEV_GUARDRAILS.md)
 - [Repository structure and contribution workflow](docs/REPOSITORY_STRUCTURE.md)
 
@@ -46,15 +46,16 @@ The installer validates the three required roles before starting the web service
 | Role | EEPROM serial |
 | --- | --- |
 | ADS-B 1090 / FlyCatcher ADS-B | `00001090` |
-| NOAA/Airband 162 / NESDR Nano2+ | `00000162` |
+| NOAA Weather Radio / NESDR Nano2+ | `00000162` |
+| Civil Airband / dedicated RTL receiver | `00000118` |
 | UAT 978 / FlyCatcher UAT | `00000978` |
 
 After final service and API validation, open `http://<pi-ip-address>:8090` in a browser on the same LAN. The launcher requires `sshpass`, `ssh`, `scp`, `tar`, and `git` in MSYS2; use `scp -O` compatibility mode as provided by the script.
 
 <!-- V1_0_RELEASE_BEGIN -->
-## v1.1.2 production release
+## v1.1.3 production release
 
-N0JCG AIR TRAFFIC CENTER v1.1.2 is the current production release of the Raspberry Pi 5 aviation receiver application.
+N0JCG AIR TRAFFIC CENTER v1.1.3 is the current production release of the Raspberry Pi 5 aviation receiver application.
 
 | Production area | Status |
 | --- | --- |
@@ -71,7 +72,7 @@ N0JCG AIR TRAFFIC CENTER v1.1.2 is the current production release of the Raspber
 
 Validated NOAA and Airband receiver settings use a 240 kHz RF input rate, 24 kHz audio, 49.6 dB RF gain, 0 PPM correction, offset tuning, and DC removal. NOAA adds FM deemphasis; Airband AM deliberately does not.
 
-See [`docs/RELEASE_V1_1_2.md`](docs/RELEASE_V1_1_2.md) for the current release scope and acceptance baseline. The original v1.0.0 release remains available as the first production baseline.
+See [`docs/RELEASE_V1_1_3.md`](docs/RELEASE_V1_1_3.md) for the current release scope and acceptance baseline. The original v1.0.0 release remains available as the first production baseline.
 <!-- V1_0_RELEASE_END -->
 
 ## Historical V0.1 initial Pi port checkpoint
@@ -82,7 +83,8 @@ The V0.1 checkpoint has validated the initial Raspberry Pi 5 + Nooelec FlyCatche
 | --- | --- |
 | Raspberry Pi 5 / Debian Trixie runtime | PASS |
 | FlyCatcher ADS-B 1090 receiver mapping | PASS |
-| NESDR Nano2+ NOAA/Airband receiver mapping | PASS |
+| NESDR Nano2+ NOAA receiver mapping | PASS |
+| Dedicated Airband receiver mapping | PASS |
 | App-owned RTL-SDR-enabled `readsb` | PASS |
 | ADS-B stale JSON startup guard | PASS |
 | ADS-B live message growth | PASS |
@@ -98,7 +100,8 @@ The V0.1 checkpoint has validated the initial Raspberry Pi 5 + Nooelec FlyCatche
 | Role | Hardware | Serial | Purpose |
 | --- | --- | --- | --- |
 | ADS-B 1090 | Nooelec FlyCatcher ADS-B side | `00001090` | Continuous ADS-B aircraft tracking via app-owned `readsb` |
-| NOAA/Airband | Nooelec NESDR Nano2+ | `00000162` | NOAA Weather Radio and civil airband AM audio |
+| NOAA Weather Radio | Nooelec NESDR Nano2+ | `00000162` | NOAA Weather Radio audio |
+| Civil Airband | Dedicated RTL receiver | `00000118` | Civil airband AM audio |
 | UAT 978 | Nooelec FlyCatcher UAT side | `00000978` | Detected and reserved for later application integration |
 
 The application resolves Linux RTL-SDR runtime indexes from EEPROM serials at startup. Do not hard-code runtime indexes; USB enumeration order can change.

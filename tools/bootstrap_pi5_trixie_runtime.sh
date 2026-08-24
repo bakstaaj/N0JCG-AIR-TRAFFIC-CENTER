@@ -70,7 +70,7 @@ cat <<'NOTE'
 Next manual hardware checks:
   - Connect FlyCatcher ADS-B USB side.
   - Connect FlyCatcher UAT USB side, even though UAT integration is reserved for later.
-  - Connect NESDR Nano2+ for NOAA/Airband.
+  - Connect the NESDR Nano2+ for NOAA and the dedicated RTL receiver for Airband.
   - Run: ./tools/pi5_flycatcher_preflight.sh
 
 Serial role assignment will be finalized in the next port checkpoint after the devices enumerate cleanly.

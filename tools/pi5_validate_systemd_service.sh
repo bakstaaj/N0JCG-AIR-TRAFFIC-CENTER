@@ -66,7 +66,7 @@ for _ in range(60):
         status, content_type, body = get("/api/status")
         payload = json.loads(body.decode("utf-8"))
         roles = payload.get("receiver_roles") or {}
-        expected = {"adsb": "00001090", "audio": "00000162", "uat": "00000978"}
+        expected = {"adsb": "00001090", "audio": "00000162", "airband": "00000118", "uat": "00000978"}
         for key, serial in expected.items():
             role = roles.get(key) or {}
             if str(role.get("serial")) != serial:

@@ -13,10 +13,10 @@ OUT = ROOT / "docs" / "publications"
 OUT.mkdir(parents=True, exist_ok=True)
 ASSETS = ROOT / "docs" / "assets" / "user-guide"
 BRAND = ROOT.parent / "N0JCG Website" / "website" / "assets" / "brand"
-GUIDE_VERSION = "1.1.1"
-GUIDE_SHORT_VERSION = "1.1"
-CAPTURE_DATE = "August 10, 2026"
-PUBLICATION_DATE = "August 12, 2026"
+GUIDE_VERSION = "1.1.3"
+GUIDE_SHORT_VERSION = "1.1.3"
+CAPTURE_DATE = "August 18, 2026"
+PUBLICATION_DATE = "August 24, 2026"
 DOCX_PATH = OUT / f"N0JCG_Air_Traffic_Center_User_Guide_v{GUIDE_SHORT_VERSION}.docx"
 
 NAVY = "0A1F44"
@@ -299,13 +299,15 @@ def make_doc():
         ("SD card", "High-endurance 32 GB or larger card; use a quality card reader and verify the image before first boot."),
         ("Network", "Ethernet is recommended for the initial setup and steady aircraft/audio operation. Wi-Fi can be used when Ethernet is unavailable."),
         ("ADS-B / UAT receiver", "Nooelec FlyCatcher dual-tuner receiver with clearly identified ADS-B and UAT paths."),
-        ("NOAA / Airband receiver", "Nooelec NESDR Nano2+ for the shared 162 MHz NOAA and civil Airband path."),
+        ("NOAA receiver", "Nooelec NESDR Nano2+ assigned to 00000162 for NOAA Weather Radio."),
+        ("Airband receiver", "Dedicated RTL receiver assigned to 00000118 for civil Airband."),
         ("USB accessories", "Powered USB hub if needed; keep the Pi power supply and receiver cabling physically secure."),
     ], [1.55, 4.95])
     doc.add_heading("Recommended antennas", level=2)
     bullet(doc, "1090 MHz: a dedicated outdoor or window-mounted ADS-B antenna with low-loss coax and a clear view of the sky.")
     bullet(doc, "978 MHz: a band-appropriate antenna or the FlyCatcher antenna path intended for UAT reception.")
-    bullet(doc, "162 MHz NOAA / civil Airband: a VHF antenna covering approximately 118-163 MHz, connected to the NESDR Nano2+.")
+    bullet(doc, "162 MHz NOAA: a VHF antenna covering approximately 162 MHz, connected to the NESDR Nano2+.")
+    bullet(doc, "Civil Airband: a VHF antenna covering approximately 118-137 MHz, connected to the dedicated Airband receiver.")
     bullet(doc, "Keep antenna cables short where practical and label each cable with its receiver role before connecting USB devices.")
     callout(doc, "Receive-only boundary", "This application only receives and displays aircraft and radio information. It does not transmit. Antenna placement, filtering, geography, and local RF conditions determine coverage and audio quality.", RED)
     doc.add_heading("Prepare the Pi operating system", level=2)
@@ -320,23 +322,25 @@ def make_doc():
     deploy_steps = new_numbering_id(doc)
     number(doc, "Enter the Pi IP address, SSH user (normally pi), and SSH password. The launcher stores reusable values in a private local .env file.", deploy_steps)
     number(doc, "Follow the prompts to insert only the named radio. The installer backs up its EEPROM, assigns the correct serial automatically, asks you to remove it, and verifies it once before continuing.", deploy_steps)
-    number(doc, "When prompted, reconnect all three receivers with their matching antennas. The installer validates the serial-to-role map before enabling the services.", deploy_steps)
+    number(doc, "When prompted, reconnect all four receivers with their matching antennas. The installer validates the serial-to-role map before enabling the services.", deploy_steps)
     number(doc, "After service and API validation pass, open http://<pi-ip-address>:8090 in a browser on the same LAN.", deploy_steps)
-    callout(doc, "Required serial map", "ADS-B 1090 uses 00001090; NOAA/Airband uses 00000162; UAT 978 uses 00000978. The installer uses stable EEPROM serials rather than transient Linux USB indexes.", BLUE)
+    callout(doc, "Required serial map", "ADS-B 1090 uses 00001090; NOAA uses 00000162; dedicated Airband uses 00000118; UAT 978 uses 00000978. The installer uses stable EEPROM serials rather than transient Linux USB indexes.", BLUE)
 
     doc.add_heading("3. Before you begin", level=1)
     doc.add_paragraph("The normal operator only needs a browser on the same LAN as the Pi. Maintainers working on the Pi should confirm the receiver labels and serials before starting or changing services.")
     table(doc, ["Role", "Receiver / source", "Permanent serial"], [
-        ("NOAA / Airband", "Nooelec NESDR Nano2+; 162 MHz NFM and civil Airband AM", "00000162"),
+        ("NOAA Weather Radio", "Nooelec NESDR Nano2+; 162 MHz NFM", "00000162"),
+        ("Civil Airband", "Dedicated RTL receiver; civil Airband AM", "00000118"),
         ("ADS-B 1090", "Nooelec FlyCatcher ADS-B side; application-owned readsb", "00001090"),
         ("UAT 978", "Nooelec FlyCatcher UAT side; dump978-fa when enabled", "00000978"),
     ], [1.35, 3.8, 1.35])
     callout(doc, "Safety boundary", "Do not swap serial assignments casually. Stop receiver-owning services before EEPROM work, back up each EEPROM, fully power-cycle after writes, and never run a second readsb service beside the application-owned decoder.", RED)
     doc.add_heading("Receiver ownership", level=2)
-    bullet(doc, "The VHF antenna belongs on the Nano2+ assigned 00000162.")
+    bullet(doc, "The NOAA VHF antenna belongs on the Nano2+ assigned 00000162.")
+    bullet(doc, "The civil Airband antenna belongs on the dedicated receiver assigned 00000118.")
     bullet(doc, "The 1090 MHz antenna belongs on the FlyCatcher ADS-B side assigned 00001090.")
     bullet(doc, "The 978 MHz antenna belongs on the FlyCatcher UAT side assigned 00000978.")
-    bullet(doc, "NOAA and Airband share 00000162 and cannot own that receiver simultaneously.")
+    bullet(doc, "NOAA and Airband have dedicated receivers: 00000162 and 00000118.")
 
     doc.add_heading("4. Open and validate the app", level=1)
     doc.add_heading("Open the browser interface", level=2)
@@ -348,7 +352,7 @@ def make_doc():
     doc.add_paragraph("These checks are for a maintainer with shell access. Run them on the Pi, not in the browser address bar.")
     code(doc, "sudo systemctl status pi-air-traffic-tracker.service --no-pager\ncurl -fsS http://127.0.0.1:8090/api/status | jq")
     bullet(doc, "Confirm the service is active and the API returns JSON.")
-    bullet(doc, "Confirm receiver_roles identify 00000162, 00001090, and 00000978 as configured.")
+    bullet(doc, "Confirm receiver_roles identify 00000162, 00000118, 00001090, and 00000978 as configured.")
     bullet(doc, "If the service is active but the UI is empty, inspect the service journal and receiver ownership before changing browser settings.")
     callout(doc, "Recovery", "A browser refresh is safe for a stale page. A service restart is an administrative action and can interrupt active receiver and audio sessions; use it only when the service or backend requires recovery.", AMBER)
 
@@ -362,7 +366,7 @@ def make_doc():
     number(doc, "Open the NOAA Weather controls from the menu.", audio_steps)
     number(doc, "Select Start NOAA Weather and choose a scan or frequency as provided by the deployment.", audio_steps)
     number(doc, "Confirm the UI reports an active state before expecting audio.", audio_steps)
-    number(doc, "Stop NOAA before starting civil Airband, because both share receiver 00000162.", audio_steps)
+    number(doc, "Stop any active NOAA listening session before starting civil Airband; Airband uses dedicated receiver 00000118.", audio_steps)
     doc.add_heading("Civil Airband", level=2)
     airband_steps = new_numbering_id(doc)
     number(doc, "Stop NOAA if it is active.", airband_steps)
@@ -410,7 +414,7 @@ def make_doc():
     table(doc, ["Symptom", "First checks", "Recovery"], [
         ("Receiver busy", "Check competing readsb/dump1090 services and USB ownership.", "Stop the conflicting service; keep the app-owned decoder as the owner."),
         ("No aircraft", "Check receiver_roles, antenna connection, decoder logs, and recent messages.", "Correct ownership/configuration, then restart the app service if needed."),
-        ("No NOAA scan", "Confirm VHF antenna and serial 00000162; inspect USB claim errors.", "Stop other audio mode and retry after service health is confirmed."),
+        ("No NOAA scan", "Confirm NOAA VHF antenna and serial 00000162; inspect USB claim errors.", "Stop other audio mode and retry after service health is confirmed."),
         ("Radar blank", "Check browser internet and radar/tile availability.", "Refresh or toggle the overlay."),
     ], [1.3, 3.0, 2.2])
     doc.add_heading("Update workflow", level=2)
@@ -428,7 +432,7 @@ def make_doc():
         "The N0JCG header, menu, ROC back button, and user guide link are visible.",
         "Status cards update and the API is reachable on the Pi.",
         "ADS-B 1090 is owned by serial 00001090; UAT 978 is 00000978 when enabled.",
-        "NOAA/Airband ownership is 00000162 and only one VHF audio mode is active at a time.",
+        "NOAA owns 00000162 and civil Airband owns dedicated receiver 00000118.",
         "Aircraft rows open detail cards without confusing missing enrichment for missing RF data.",
         "Radar behavior is checked from the browser network path, not inferred from receiver state.",
     ]:

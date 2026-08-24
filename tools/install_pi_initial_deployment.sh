@@ -79,7 +79,7 @@ cat <<EOF
 
 The Pi will now:
   1. Install OS/runtime packages and the app-owned RTL decoders.
-  2. Guide you through one-at-a-time serial programming for the three receivers.
+  2. Guide you through one-at-a-time serial programming for the four receivers.
   3. Validate all serial roles before enabling the web service.
   4. Start and validate the service on port 8090.
 

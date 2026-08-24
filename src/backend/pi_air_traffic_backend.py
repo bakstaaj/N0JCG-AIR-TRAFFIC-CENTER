@@ -7,7 +7,8 @@ resolution and readsb startup.
 
 Receiver serial ownership for the initial Pi 5 hardware target:
   * 00001090 -> FlyCatcher ADS-B 1090 MHz
-  * 00000162 -> NESDR Nano2+ NOAA/Airband
+  * 00000162 -> NESDR Nano2+ NOAA Weather Radio
+  * 00000118 -> dedicated Airband receiver
   * 00000978 -> FlyCatcher UAT 978 MHz, detected but disabled for now
 
 Do not hard-code runtime device indexes. They are resolved from EEPROM serials
@@ -36,6 +37,7 @@ from n0jcg_licensing import LicenseClient, LicenseError
 
 ADSB_SERIAL = os.environ.get("PI_AIR_TRAFFIC_ADSB_SERIAL", "00001090")
 AUDIO_SERIAL = os.environ.get("PI_AIR_TRAFFIC_AUDIO_SERIAL", "00000162")
+AIRBAND_SERIAL = os.environ.get("PI_AIR_TRAFFIC_AIRBAND_SERIAL", "00000118")
 UAT_SERIAL = os.environ.get("PI_AIR_TRAFFIC_UAT_SERIAL", "00000978")
 UAT_FREQUENCY_HZ = int(os.environ.get("PI_AIR_TRAFFIC_UAT_FREQUENCY_HZ", "978000000"))
 UAT_GAIN_DB = float(os.environ.get("PI_AIR_TRAFFIC_UAT_GAIN_DB", "49.6"))
@@ -233,6 +235,7 @@ def linux_path(path: Path) -> str:
 # The imported AudioManager methods resolve these globals at runtime.
 win_backend.ADSB_SERIAL = ADSB_SERIAL
 win_backend.AUDIO_SERIAL = AUDIO_SERIAL
+win_backend.AIRBAND_SERIAL = AIRBAND_SERIAL
 win_backend.windows_path = linux_path
 
 
@@ -328,13 +331,15 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
             "mapping_policy": "resolve_runtime_indexes_from_rtl_eeprom_serials",
             "expected_serials": {
                 "adsb_1090": ADSB_SERIAL,
-                "audio_noaa_airband": AUDIO_SERIAL,
+                "noaa": AUDIO_SERIAL,
+                "airband": AIRBAND_SERIAL,
                 "uat_978": UAT_SERIAL,
             },
             "device_count": len(devices),
             "devices": devices,
             "adsb": self._role_from_serial(devices, ADSB_SERIAL, "adsb_1090", True),
-            "audio": self._role_from_serial(devices, AUDIO_SERIAL, "noaa_airband", True),
+            "audio": self._role_from_serial(devices, AUDIO_SERIAL, "noaa", True),
+            "airband": self._role_from_serial(devices, AIRBAND_SERIAL, "airband", True),
             "uat": self._role_from_serial(devices, UAT_SERIAL, "uat_978", False),
         }
         self.roles = mapping
@@ -1205,7 +1210,8 @@ def patch_pi_port_handler_status(pi_port: Any) -> None:
         payload["pi_backend"] = {
             "serial_contract": {
                 "adsb_1090": ADSB_SERIAL,
-                "noaa_airband": AUDIO_SERIAL,
+                "noaa": AUDIO_SERIAL,
+                "airband": AIRBAND_SERIAL,
                 "uat_978": UAT_SERIAL,
             },
             "readsb_command": getattr(self.manager, "readsb_command_path", None) or "readsb",
@@ -1368,6 +1374,7 @@ def main() -> int:
     pi_port.DecoderManager = PiSerialDecoderManager
     pi_port.ADSB_SERIAL = ADSB_SERIAL
     pi_port.AUDIO_SERIAL = AUDIO_SERIAL
+    pi_port.AIRBAND_SERIAL = AIRBAND_SERIAL
     pi_port.windows_path = linux_path
     patch_pi_port_handler_status(pi_port)
     patch_pi_license_handler(pi_port)

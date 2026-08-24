@@ -130,7 +130,7 @@ log "RTL_DEVICE_COUNT=${DEVICE_COUNT:-0}"
 if [[ "${DEVICE_COUNT:-0}" =~ ^[0-9]+$ && "${DEVICE_COUNT:-0}" -ge 3 ]]; then
   pass "at least three RTL devices are visible"
 else
-  warn "fewer than three RTL devices were parsed; expected ADS-B, NOAA/Airband, and UAT"
+  warn "fewer than four RTL devices were parsed; expected ADS-B, NOAA, Airband, and UAT"
 fi
 
 python3 - "$RTL_JSON" "$UAT_SERIAL" "$ADSB_SERIAL" "$AUDIO_SERIAL" "$WORK_DIR/uat_role.json" <<'PY'

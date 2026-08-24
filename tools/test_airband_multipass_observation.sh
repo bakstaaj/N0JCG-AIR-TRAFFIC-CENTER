@@ -52,7 +52,7 @@ done
 MESSAGES_BEFORE="$(python3 - "${STATUS_BEFORE}" <<'PY' | tr -d '\r'
 import json,sys
 d=json.load(open(sys.argv[1],encoding="utf-8")); assert d["decoder"]["json_ready"] is True
-assert d["receiver_roles"]["audio"]["serial"]=="00000162"
+assert d["receiver_roles"]["airband"]["serial"]=="00000118"
 print(int(d["decoder"].get("messages",0)))
 PY
 )"

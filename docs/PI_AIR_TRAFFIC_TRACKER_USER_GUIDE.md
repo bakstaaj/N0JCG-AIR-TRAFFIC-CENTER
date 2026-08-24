@@ -3,15 +3,16 @@
 **Platform:** Raspberry Pi 5 running Debian/Raspberry Pi OS Trixie  
 **Application service:** `pi-air-traffic-tracker.service`  
 **Default web port:** `8090`  
-**Guide revision:** August 12, 2026
+**Guide revision:** August 24, 2026 (v1.1.3)
 
 ## 1. Scope
 
 This guide covers installation, receiver identification, RTL-SDR EEPROM serial assignment, service setup, validation, and normal operation of **N0JCG AIR TRAFFIC CENTER**. The canonical repository is `N0JCG-AIR-TRAFFIC-CENTER`; existing `PI-AIR-TRAFFIC-TRACKER` checkout paths remain supported for installed service compatibility.
 
-The three receiver roles covered here are:
+The four receiver roles covered here are:
 
-- NOAA Weather Radio and civil Airband audio on the shared 162/VHF receiver.
+- NOAA Weather Radio audio on the `00000162` VHF receiver.
+- Civil Airband audio on the dedicated `00000118` receiver.
 - ADS-B aircraft reception on 1090 MHz.
 - UAT aircraft reception on 978 MHz.
 
@@ -27,7 +28,8 @@ Use this dedicated section when building a new standalone N0JCG Air Traffic Cent
 - High-endurance 32 GB or larger microSD card and a quality card reader.
 - Ethernet cable for the initial setup and recommended normal operation. Wi-Fi is supported when Ethernet is unavailable.
 - Nooelec FlyCatcher dual-tuner receiver with its ADS-B and UAT paths physically identified.
-- Nooelec NESDR Nano2+ for the shared NOAA Weather Radio and civil Airband receiver path.
+- Nooelec NESDR Nano2+ for NOAA Weather Radio.
+- A dedicated RTL receiver for civil Airband.
 - Powered USB hub when the Pi power budget or cable layout requires one.
 - Band-appropriate antennas, coax, and labels for each receiver path.
 
@@ -68,10 +70,11 @@ The required serial assignments are:
 | Radio role | Required serial |
 | --- | --- |
 | ADS-B / FlyCatcher ADS-B path | `00001090` |
-| NOAA/Airband / NESDR Nano2+ | `00000162` |
+| NOAA Weather Radio / NESDR Nano2+ | `00000162` |
+| Civil Airband / dedicated RTL receiver | `00000118` |
 | UAT / FlyCatcher UAT path | `00000978` |
 
-After all three radios are programmed, reconnect them with their antennas. The installer validates the serial-role map, installs the app-owned decoders and services, starts the Pi web/API service, and runs the final checks. When it reports success, open:
+After all four radios are programmed, reconnect them with their antennas. The installer validates the serial-role map, installs the app-owned decoders and services, starts the Pi web/API service, and runs the final checks. When it reports success, open:
 
 ```text
 http://<pi-ip-address>:8090
@@ -85,7 +88,8 @@ The application owns receivers by their permanent RTL-SDR EEPROM serial numbers.
 
 | Application role | Physical receiver | Frequency use | Required EEPROM serial | Normal runtime |
 | --- | --- | --- | --- | --- |
-| NOAA 162 / Airband | Nooelec NESDR Nano2+ | NOAA 162 MHz NFM and civil Airband AM | `00000162` | `rtl_power` and `rtl_fm` |
+| NOAA Weather Radio | Nooelec NESDR Nano2+ | NOAA 162 MHz NFM | `00000162` | `rtl_power` and `rtl_fm` |
+| Civil Airband | Dedicated RTL receiver | Civil Airband AM | `00000118` | `rtl_power` and `rtl_fm` |
 | ADS-B 1090 | Nooelec FlyCatcher ADS-B side | 1090 MHz ADS-B | `00001090` | App-owned `readsb` |
 | UAT 978 | Nooelec FlyCatcher UAT side | 978 MHz UAT | `00000978` | App-owned `dump978-fa` when enabled |
 
@@ -96,14 +100,16 @@ Use the leading zeroes exactly as shown. Each value is an eight-character serial
 Place a label on each antenna cable and receiver connection:
 
 ```text
-NOAA / AIRBAND   SN 00000162
+NOAA WEATHER     SN 00000162
+AIRBAND          SN 00000118
 ADS-B 1090       SN 00001090
 UAT 978           SN 00000978
 ```
 
 Connect the antennas to their matching receiver paths:
 
-- The VHF antenna connects to the Nano2+ assigned `00000162`.
+- The NOAA VHF antenna connects to the Nano2+ assigned `00000162`.
+- The civil Airband antenna connects to the dedicated receiver assigned `00000118`.
 - The 1090 MHz antenna connects to the FlyCatcher ADS-B side assigned `00001090`.
 - The 978 MHz antenna connects to the FlyCatcher UAT side assigned `00000978`.
 
@@ -212,15 +218,16 @@ mkdir -p runtime/preflight
 rtl_test -t 2>&1 | tee runtime/preflight/rtl_inventory_before_serials.txt
 ```
 
-A fully named installation should eventually contain all three lines, although the numeric indexes may differ:
+A fully named installation should eventually contain all four lines, although the numeric indexes may differ:
 
 ```text
 SN: 00000162
+SN: 00000118
 SN: 00001090
 SN: 00000978
 ```
 
-Inspect EEPROM identity data for every listed index. If three receivers appear as indexes 0, 1, and 2:
+Inspect EEPROM identity data for every listed index. If four receivers appear as indexes 0, 1, 2, and 3:
 
 ```bash
 rtl_eeprom -d 0
@@ -232,7 +239,8 @@ Record a table before writing anything:
 
 | Current index | Manufacturer/product | Physical role | Current serial | Required serial |
 | --- | --- | --- | --- | --- |
-| Confirmed index | NESDR Nano2+ | NOAA/Airband | Record value | `00000162` |
+| Confirmed index | NESDR Nano2+ | NOAA Weather Radio | Record value | `00000162` |
+| Confirmed index | Dedicated RTL receiver | Civil Airband | Record value | `00000118` |
 | Confirmed index | FlyCatcher ADS-B side | ADS-B 1090 | Record value | `00001090` |
 | Confirmed index | FlyCatcher UAT side | UAT 978 | Record value | `00000978` |
 
@@ -275,6 +283,7 @@ Recheck each variable and physical role immediately before its command. Then wri
 
 ```bash
 sudo rtl_eeprom -d "$NOAA_INDEX" -s 00000162
+sudo rtl_eeprom -d "$AIRBAND_INDEX" -s 00000118
 sudo rtl_eeprom -d "$ADSB_INDEX" -s 00001090
 sudo rtl_eeprom -d "$UAT_INDEX" -s 00000978
 ```
@@ -349,7 +358,7 @@ UAT remains an operator-selectable traffic source. Installing the binary does no
 
 ## 7. Configure USBFS memory for concurrent receivers
 
-ADS-B, UAT, and NOAA/Airband can run concurrently. Install the project’s USBFS memory unit and service dependency before installing the main service:
+ADS-B, UAT, NOAA, and Airband can run concurrently. Install the project’s USBFS memory unit and service dependency before installing the main service:
 
 ```bash
 cd ~/sdrdev/PI-AIR-TRAFFIC-TRACKER
@@ -387,10 +396,11 @@ cd ~/sdrdev/PI-AIR-TRAFFIC-TRACKER
 sudo ./tools/pi5_install_systemd_service.sh
 ```
 
-The installer writes the three serial assignments into the service environment:
+The installer writes the four serial assignments into the service environment:
 
 ```text
 PI_AIR_TRAFFIC_AUDIO_SERIAL=00000162
+PI_AIR_TRAFFIC_AIRBAND_SERIAL=00000118
 PI_AIR_TRAFFIC_ADSB_SERIAL=00001090
 PI_AIR_TRAFFIC_UAT_SERIAL=00000978
 ```
@@ -441,6 +451,7 @@ Verify that the reported roles contain:
 ```text
 ADS-B serial:       00001090
 NOAA/audio serial:  00000162
+Airband serial:     00000118
 UAT serial:         00000978
 ```
 
@@ -500,7 +511,7 @@ The operator does not use separate maps for ADS-B and UAT. Enabled sources feed 
 
 ## 12. NOAA Weather Radio operation
 
-NOAA and Airband share receiver serial `00000162`; they cannot own that receiver simultaneously.
+NOAA uses receiver serial `00000162`. Civil Airband uses the dedicated receiver serial `00000118`.
 
 To start NOAA:
 
@@ -527,7 +538,7 @@ Use **Reset & Rescan NOAA** when the receiver location, antenna, or RF environme
 
 ## 13. Civil Airband operation
 
-Airband uses the same `00000162` receiver in AM mode. Stop NOAA before starting Airband.
+Airband uses the dedicated `00000118` receiver in AM mode. Stop any active NOAA listening session before starting Airband from the application UI.
 
 The recommended normal mode is **Fast Spectrum Search**, which examines 120–130 MHz for RF activity and audio-validates only the strongest candidates instead of listening linearly to every quiet channel.
 
@@ -630,7 +641,7 @@ The expected USBFS value is `0`. Reinstall the unit and drop-in from Section 7 i
 
 ### NOAA scan does not find a usable station
 
-- Confirm the VHF antenna is connected to serial `00000162`.
+- Confirm the NOAA VHF antenna is connected to serial `00000162` and the Airband antenna is connected to serial `00000118`.
 - Stop Airband before starting NOAA.
 - Use **Reset & Rescan NOAA**.
 - Check service logs for USB claim or allocation errors.
@@ -641,7 +652,8 @@ Infrequent voice traffic is normal in some locations. Use Fast Spectrum Search a
 
 ## 17. Final installation checklist
 
-- [ ] Nano2+ is physically labeled NOAA/Airband and reports `00000162`.
+- [ ] Nano2+ is physically labeled NOAA and reports `00000162`.
+- [ ] Dedicated Airband receiver is physically labeled and reports `00000118`.
 - [ ] FlyCatcher ADS-B side is physically labeled and reports `00001090`.
 - [ ] FlyCatcher UAT side is physically labeled and reports `00000978`.
 - [ ] All three EEPROM backups exist under `runtime/preflight/`.
@@ -650,7 +662,7 @@ Infrequent voice traffic is normal in some locations. Use Fast Spectrum Search a
 - [ ] `runtime/bin/dump978-fa` is installed and executable.
 - [ ] USBFS memory service is enabled and reports `0`.
 - [ ] `pi-air-traffic-tracker.service` is enabled and active.
-- [ ] `/api/status` reports all three correct serial roles.
+- [ ] `/api/status` reports all four correct serial roles.
 - [ ] ADS-B 1090 is enabled and its message feed is growing.
 - [ ] NOAA can scan and deliver browser audio.
 - [ ] Airband Fast Spectrum Search completes a sweep.

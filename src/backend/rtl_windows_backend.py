@@ -41,6 +41,7 @@ from urllib.request import urlopen
 LOG = logging.getLogger("rtl_windows_backend")
 ADSB_SERIAL = "00001090"
 AUDIO_SERIAL = "00000162"
+AIRBAND_SERIAL = "00000118"
 DEFAULT_RECEIVER_LOCATION = {
     "latitude": 38.7467,
     "longitude": -105.1783,
@@ -208,7 +209,7 @@ class DecoderManager:
         if mapping.get("adsb", {}).get("serial") != ADSB_SERIAL:
             raise RuntimeError(f"ADS-B serial {ADSB_SERIAL} was not resolved: {mapping}")
         if mapping.get("audio", {}).get("serial") != AUDIO_SERIAL:
-            raise RuntimeError(f"Audio serial {AUDIO_SERIAL} was not resolved: {mapping}")
+            raise RuntimeError(f"NOAA serial {AUDIO_SERIAL} was not resolved: {mapping}")
         self.roles = mapping
         return mapping
 
@@ -401,14 +402,16 @@ class AudioManager:
         self.live_max_chunks = 24
         self.live_profile: dict[str, Any] | None = None
         self.live_channel: dict[str, Any] | None = None
+        self.live_serial = AUDIO_SERIAL
+        self.live_role = "audio"
 
-    def audio_index(self) -> int:
+    def audio_index(self, serial: str = AUDIO_SERIAL, role_name: str = "audio") -> int:
         if self.decoder.roles is None:
             self.decoder.resolve_roles()
         assert self.decoder.roles is not None
-        role = self.decoder.roles.get("audio", {})
-        if role.get("serial") != AUDIO_SERIAL:
-            raise RuntimeError(f"NOAA/Airband serial {AUDIO_SERIAL} is not mapped: {self.decoder.roles}")
+        role = self.decoder.roles.get(role_name, {})
+        if role.get("serial") != serial:
+            raise RuntimeError(f"Audio serial {serial} is not mapped: {self.decoder.roles}")
         return int(role["index"])
 
     def is_running(self) -> bool:
@@ -444,7 +447,7 @@ class AudioManager:
                 "running": self.live_is_running(),
                 "profile": self.live_profile or NOAA_PROFILE,
                 "channel": self.live_channel,
-                "audio_role": self.decoder.roles.get("audio") if self.decoder.roles else None,
+                "audio_role": self.decoder.roles.get(self.live_role) if self.decoder.roles else None,
                 "chunk_seconds": self.live_chunk_seconds,
                 "latest_sequence": self.live_sequence,
                 "available_chunks": len(self.live_chunks),
@@ -452,7 +455,13 @@ class AudioManager:
                 "last_error": self.live_error,
             }
 
-    def _start_live_process(self, profile: dict[str, Any], channel: dict[str, Any] | None) -> dict[str, Any]:
+    def _start_live_process(
+        self,
+        profile: dict[str, Any],
+        channel: dict[str, Any] | None,
+        serial: str = AUDIO_SERIAL,
+        role_name: str = "audio",
+    ) -> dict[str, Any]:
         with self.lock:
             if self.is_running():
                 raise RuntimeError("Stop the NOAA recording before starting live listening.")
@@ -461,7 +470,16 @@ class AudioManager:
             rtl_fm = shutil.which("rtl_fm")
             if not rtl_fm:
                 raise RuntimeError("rtl_fm is not available in PATH.")
-            index = self.audio_index()
+            effective_serial = serial
+            effective_role = role_name
+            # The Windows compatibility probe predates the dedicated Airband
+            # role. Keep that port usable by falling back to the shared audio
+            # receiver when no explicit Airband role was discovered; Pi
+            # startup supplies the dedicated role and never takes this path.
+            if role_name == "airband" and self.decoder.roles and "airband" not in self.decoder.roles:
+                effective_serial = AUDIO_SERIAL
+                effective_role = "audio"
+            index = self.audio_index(effective_serial, effective_role)
             self.runtime_dir.mkdir(parents=True, exist_ok=True)
             live_log_path = self.runtime_dir / "latest_live_audio_rtl_fm.log"
             live_log_path.unlink(missing_ok=True)
@@ -471,7 +489,7 @@ class AudioManager:
             output_sample_rate_hz = int(profile["sample_rate_hz"])
             command = [
                 windows_path(Path(rtl_fm)),
-                "-d", AUDIO_SERIAL,
+                "-d", effective_serial,
                 "-f", str(profile["frequency_hz"]),
                 "-M", str(profile["rtl_fm_mode"]),
                 "-s", str(input_sample_rate_hz),
@@ -493,12 +511,14 @@ class AudioManager:
             self.live_error = None
             self.live_profile = dict(profile)
             self.live_channel = dict(channel) if channel else None
+            self.live_serial = effective_serial
+            self.live_role = effective_role
             self.live_stop_event.clear()
             LOG.info(
                 "Starting live %s listening at %s Hz for audio serial %s; current diagnostic index is %s",
                 profile["modulation"],
                 profile["frequency_hz"],
-                AUDIO_SERIAL,
+                effective_serial,
                 index,
             )
             self.live_process = subprocess.Popen(
@@ -516,13 +536,13 @@ class AudioManager:
     def start_live(self) -> dict[str, Any]:
         profile = dict(NOAA_PROFILE)
         profile["rtl_fm_mode"] = "fm"
-        return self._start_live_process(profile, None)
+        return self._start_live_process(profile, None, AUDIO_SERIAL, "audio")
 
     def start_airband_live(self, channel: dict[str, Any]) -> dict[str, Any]:
         profile = dict(AIRBAND_LIVE_AUDIO_PROFILE)
         profile["frequency_hz"] = int(channel["frequency_hz"])
         profile["rtl_fm_mode"] = "am"
-        return self._start_live_process(profile, channel)
+        return self._start_live_process(profile, channel, AIRBAND_SERIAL, "airband")
 
     def _pump_live_pcm(self) -> None:
         profile = self.live_profile or NOAA_PROFILE
@@ -606,7 +626,7 @@ class AudioManager:
             rtl_fm = shutil.which("rtl_fm")
             if not rtl_fm:
                 raise RuntimeError("rtl_fm is not available in PATH.")
-            index = self.audio_index()
+            index = self.audio_index(AUDIO_SERIAL, "audio")
             self.runtime_dir.mkdir(parents=True, exist_ok=True)
             for path in (self.raw_path, self.wav_path, self.log_path):
                 path.unlink(missing_ok=True)
