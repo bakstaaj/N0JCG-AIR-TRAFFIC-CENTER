@@ -104,6 +104,7 @@ section "Installing dump978 log rotation"
 LOGROTATE_PATH="/etc/logrotate.d/n0jcg-air-traffic-center"
 cat > "$LOGROTATE_PATH" <<LOGROTATE
 ${APP_ROOT}/runtime/logs/dump978_uat_978.log {
+    su ${APP_USER} ${APP_GROUP}
     size 10M
     rotate 3
     daily

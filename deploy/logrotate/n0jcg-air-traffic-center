@@ -3,6 +3,7 @@
 # copytruncate is required because the backend keeps the child process stdout
 # file descriptor open for the lifetime of the decoder.
 /home/pi/sdrdev/PI-AIR-TRAFFIC-TRACKER/runtime/logs/dump978_uat_978.log {
+    su pi pi
     size 10M
     rotate 3
     daily
