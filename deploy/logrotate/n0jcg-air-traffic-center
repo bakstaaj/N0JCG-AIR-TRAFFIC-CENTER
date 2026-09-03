@@ -1,0 +1,14 @@
+
+# Keep the app-owned UAT decoder log bounded while dump978-fa remains running.
+# copytruncate is required because the backend keeps the child process stdout
+# file descriptor open for the lifetime of the decoder.
+/home/pi/sdrdev/PI-AIR-TRAFFIC-TRACKER/runtime/logs/dump978_uat_978.log {
+    size 10M
+    rotate 3
+    daily
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+}

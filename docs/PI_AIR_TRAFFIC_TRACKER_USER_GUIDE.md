@@ -420,6 +420,8 @@ sudo systemctl start pi-air-traffic-tracker.service
 sudo journalctl -u pi-air-traffic-tracker.service -n 200 --no-pager
 ```
 
+The app-owned UAT decoder log is managed by `/etc/logrotate.d/n0jcg-air-traffic-center`. It rotates at 10 MB, retains three compressed rotations, and uses `copytruncate` so rotation does not interrupt a running `dump978-fa` process.
+
 ## 9. Validate the complete installation
 
 Run the core validators:

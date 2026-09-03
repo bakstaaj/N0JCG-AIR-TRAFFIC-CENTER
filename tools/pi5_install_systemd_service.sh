@@ -100,6 +100,23 @@ chown -R "${APP_USER}:${APP_GROUP}" runtime
 usermod -aG plugdev,audio,video,dialout "$APP_USER" 2>/dev/null || warn "could not add $APP_USER to all SDR/audio groups; continuing"
 pass "runtime directories prepared"
 
+section "Installing dump978 log rotation"
+LOGROTATE_PATH="/etc/logrotate.d/n0jcg-air-traffic-center"
+cat > "$LOGROTATE_PATH" <<LOGROTATE
+${APP_ROOT}/runtime/logs/dump978_uat_978.log {
+    size 10M
+    rotate 3
+    daily
+    missingok
+    notifempty
+    compress
+    delaycompress
+    copytruncate
+}
+LOGROTATE
+chmod 0644 "$LOGROTATE_PATH"
+pass "dump978 log rotation configured at 10 MB: $LOGROTATE_PATH"
+
 section "Disabling conflicting distro readsb service"
 systemctl disable --now readsb.service >/dev/null 2>&1 || true
 if systemctl is-active --quiet readsb.service 2>/dev/null; then
