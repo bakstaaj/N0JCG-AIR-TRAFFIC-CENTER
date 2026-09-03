@@ -107,7 +107,6 @@ ${APP_ROOT}/runtime/logs/dump978_uat_978.log {
     su ${APP_USER} ${APP_GROUP}
     size 10M
     rotate 3
-    daily
     missingok
     notifempty
     compress
