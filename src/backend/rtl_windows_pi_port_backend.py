@@ -630,6 +630,8 @@ class AudioOperations:
         high_hz: int,
         bin_hz: int,
         gain_db: float,
+        serial: str = AIRBAND_SERIAL,
+        role_name: str = "airband",
     ) -> list[dict[str, Any]]:
         # PI_SHARED_AUDIO_SDR_HARDENING_V1: run one rtl_power sweep using serial-first shared audio receiver selection.
         with self.lock:
@@ -641,14 +643,14 @@ class AudioOperations:
                     "Fast Spectrum Search requires rtl_power.exe in PATH alongside rtl_fm.exe. "
                     "Traditional Audio Samples remains available."
                 )
-            index = self.audio.audio_index()
+            index = self.audio.audio_index(serial, role_name)
             self.audio.runtime_dir.mkdir(parents=True, exist_ok=True)
             csv_path = self.audio.runtime_dir / "latest_airband_fast_spectrum.csv"
             log_path = self.audio.runtime_dir / "latest_airband_fast_spectrum.log"
             csv_path.unlink(missing_ok=True)
             log_path.unlink(missing_ok=True)
 
-            device_candidates: list[str] = [AIRBAND_SERIAL]
+            device_candidates: list[str] = [serial]
             index_text = str(index)
             if index_text not in device_candidates:
                 device_candidates.append(index_text)
@@ -785,6 +787,8 @@ class AudioOperations:
             NOAA_SEARCH_HIGH_HZ,
             NOAA_SEARCH_BIN_HZ,
             spectrum_gain_db,
+            AUDIO_SERIAL,
+            "audio",
         )
         time.sleep(max(0.0, AUDIO_RTL_RELEASE_SETTLE_SECONDS))
 
