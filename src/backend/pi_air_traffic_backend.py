@@ -312,6 +312,20 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
         role.update({"role": role_name, "enabled": enabled})
         return role
 
+    @staticmethod
+    def _optional_role(devices: list[dict[str, Any]], serial: str, role_name: str, enabled: bool) -> dict[str, Any]:
+        device = next((item for item in devices if str(item.get("serial")) == serial), None)
+        if device is None:
+            return {
+                "role": role_name,
+                "serial": serial,
+                "enabled": enabled,
+                "available": False,
+            }
+        role = dict(device)
+        role.update({"role": role_name, "enabled": enabled, "available": True})
+        return role
+
     def check_runtime_files(self) -> None:
         if not (shutil.which("readsb") or shutil.which("dump1090")):
             raise RuntimeError("Neither readsb nor dump1090 is available in PATH.")
@@ -325,6 +339,8 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
         duplicates = sorted({serial for serial in serials if serials.count(serial) > 1})
         if duplicates:
             raise RuntimeError(f"Duplicate RTL serials are not allowed for Pi receiver ownership: {duplicates}")
+        traffic_settings = load_traffic_source_settings(self.root)
+        uat_enabled = bool(traffic_settings.get("uat_978_enabled", False))
         mapping = {
             "ok": True,
             "platform": "raspberry_pi_5_trixie",
@@ -338,10 +354,16 @@ class PiSerialDecoderManager(win_backend.DecoderManager):
             "device_count": len(devices),
             "devices": devices,
             "adsb": self._role_from_serial(devices, ADSB_SERIAL, "adsb_1090", True),
-            "audio": self._role_from_serial(devices, AUDIO_SERIAL, "noaa", True),
-            "airband": self._role_from_serial(devices, AIRBAND_SERIAL, "airband", True),
-            "uat": self._role_from_serial(devices, UAT_SERIAL, "uat_978", False),
+            # NOAA, Airband, and UAT are optional roles. Their absence must not
+            # prevent the independent ADS-B receiver from starting.
+            "audio": self._optional_role(devices, AUDIO_SERIAL, "noaa", True),
+            "airband": self._optional_role(devices, AIRBAND_SERIAL, "airband", True),
+            "uat": self._optional_role(devices, UAT_SERIAL, "uat_978", uat_enabled),
         }
+        mapping["missing_optional_roles"] = [
+            role for role in ("audio", "airband", "uat")
+            if not mapping[role].get("available", False)
+        ]
         self.roles = mapping
         return mapping
 
