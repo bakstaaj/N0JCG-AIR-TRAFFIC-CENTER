@@ -1124,6 +1124,22 @@ function updateAudioButtons(status) {
   state.className = 'value ' + ((busy || live) ? 'busy' : 'ready');
 }
 
+async function selectNoaaChannel() {
+  const select = el('noaaChannelSelect');
+  if (!select) return;
+  try {
+    const frequencyHz = Number(select.value);
+    const result = await jsonRequest('/api/noaa/select', {
+      method: 'POST',
+      body: JSON.stringify({frequency_hz: frequencyHz})
+    });
+    setMessage('operationsMessage', `NOAA channel ${select.options[select.selectedIndex].text} saved. It will be used the next time NOAA starts.`, 'good');
+    if (result.noaa_frequency_hz) await updateStatus();
+  } catch (error) {
+    setMessage('operationsMessage', `NOAA channel selection failed: ${error.message}`, 'error');
+  }
+}
+
 function renderLocation(location) {
   if (!location) {
     setMessage('locationMessage', 'No receiver location configured. Enter the antenna location and save it.', 'warning');
@@ -2055,7 +2071,7 @@ function formatAirbandHoldScannerMessage(status) {
 function syncAirbandHoldAudio(status) {
   renderBlockedAirbandFrequencies(status);
   const holding = Boolean(status.airband_hold_active);
-  el('airbandSkipHeld').disabled = !holding;
+  if (el('airbandSkipHeld')) el('airbandSkipHeld').disabled = !holding;
   el('airbandBlockHeld').disabled = !holding;
   if (!holding) {
     if (airbandPlayingHoldId !== null) stopAirbandPlayback();
@@ -2734,6 +2750,10 @@ async function refreshOperationMenu() {
     const noaaBrowserPlaying = Boolean(liveListening && liveAudioContext && noaaPlaybackChunksScheduled > 0);
     const noaaActive = Boolean(noaaBackendActive || liveListening);
     const airbandActive = Boolean(airband.airband_scan_running);
+    const noaaChannelSelect = el('noaaChannelSelect');
+    if (noaaChannelSelect && document.activeElement !== noaaChannelSelect) {
+      noaaChannelSelect.value = String(status.noaa_frequency_hz || '');
+    }
     updateAirbandTuningDetail(airband, noaaActive);
     syncAirbandHoldAudio(airband);
 
@@ -2813,7 +2833,7 @@ async function stopAirbandBackground(changePreference = true, showOverlay = true
     await jsonRequest('/api/airband/scan/activity/stop', {method: 'POST'});
   } catch (_) {}
   stopAirbandPlayback();
-  el('airbandSkipHeld').disabled = true;
+  if (el('airbandSkipHeld')) el('airbandSkipHeld').disabled = true;
   el('airbandBlockHeld').disabled = true;
   const released = await waitForAirbandStopped();
   /* Step 71: guarantee Airband menu stop releases busy overlay */
@@ -2947,9 +2967,10 @@ function bindControls() {
   el('menuBackdrop').addEventListener('click', closeMenu);
   el('registrationTopButton').addEventListener('click', restartFreeTrial);
   el('noaaMenuToggle').addEventListener('click', toggleNoaaMenuOperation);
+  el('noaaChannelSelect').addEventListener('change', selectNoaaChannel);
   el('airbandMenuToggle').addEventListener('click', toggleAirbandMenuOperation);
   el('activateLicenseBtn').addEventListener('click', activateLicense);
-  el('airbandSkipHeld').addEventListener('click', skipHeldAirbandChannel);
+  if (el('airbandSkipHeld')) el('airbandSkipHeld').addEventListener('click', skipHeldAirbandChannel);
   el('airbandBlockHeld').addEventListener('click', blockHeldAirbandChannel);
   el('clearAirbandBlocks').addEventListener('click', clearBlockedAirbandFrequencies);
   el('startLive').addEventListener('click', startLive);

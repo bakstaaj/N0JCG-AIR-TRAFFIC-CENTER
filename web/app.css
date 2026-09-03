@@ -300,6 +300,8 @@ body { padding: 0; }
 
 /* Step 57: map scanner controls and Airband apply layout */
 .airband-apply-row { margin-top: 5px; }
+.noaa-channel-picker { display: flex; flex-direction: column; gap: 2px; min-width: 150px; color: var(--muted); font-size: 10px; }
+.noaa-channel-picker select { min-height: 30px; padding: 4px 7px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); color: var(--text); font: inherit; }
 .airband-apply-row #saveAirbandTuning { min-width: 128px; }
 .map-scanner-actions { display: flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 10px; color: var(--muted); }
 .map-scanner-actions button { padding: 3px 7px; min-height: 21px; font-size: 10px; line-height: 1.05; border-radius: 4px; }

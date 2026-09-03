@@ -66,6 +66,19 @@ NOAA_FREQUENCIES = [
     162400000, 162425000, 162450000, 162475000,
     162500000, 162525000, 162550000,
 ]
+NOAA_CHANNEL_NAMES = {
+    162400000: "WX1",
+    162425000: "WX2",
+    162450000: "WX3",
+    162475000: "WX4",
+    162500000: "WX5",
+    162525000: "WX6",
+    162550000: "WX7",
+}
+NOAA_SEARCH_LOW_HZ = 162_395_000
+NOAA_SEARCH_HIGH_HZ = 162_555_000
+NOAA_SEARCH_BIN_HZ = 1_000
+NOAA_SEARCH_GAIN_DB = 40.0
 DEFAULT_RADIUS_MILES = 100.0
 DEFAULT_AIRBAND_ACTIVITY_RMS = 1300.0
 DEFAULT_AIRBAND_RF_GAIN_DB = float(AIRBAND_LIVE_AUDIO_PROFILE.get("gain_db", 40.2))
@@ -411,7 +424,6 @@ class PiPortSettingsStore(SettingsStore):
         self.noaa_station = "Selection cleared — awaiting Fast NOAA scan"
         self.noaa_selection_location_key = None
         self._persist_port_settings()
-
 
 def rms_from_wav(content: bytes) -> float:
     with wave.open(io.BytesIO(content), "rb") as wav_file:
@@ -763,11 +775,15 @@ class AudioOperations:
         # Measure every standard NOAA carrier in one RF sweep. A carrier that
         # leads by at least 4 dB wins after audio confirmation. Audio quality is
         # used only to resolve close RF candidates.
-        spectrum_gain_db = float(NOAA_PROFILE.get("gain_db", DEFAULT_AIRBAND_RF_GAIN_DB))
+        # Match the standalone N0JCG Weather Radio search: a 1 kHz-bin
+        # rtl_power survey across the complete NOAA band with 40 dB gain.
+        # Live tuning still uses the validated NOAA_PROFILE (240 kHz input,
+        # 24 kHz audio, offset/DC/deemphasis and zero PPM).
+        spectrum_gain_db = NOAA_SEARCH_GAIN_DB
         rows = self.capture_airband_spectrum(
-            FAST_NOAA_LOW_HZ,
-            FAST_NOAA_HIGH_HZ,
-            FAST_NOAA_BIN_HZ,
+            NOAA_SEARCH_LOW_HZ,
+            NOAA_SEARCH_HIGH_HZ,
+            NOAA_SEARCH_BIN_HZ,
             spectrum_gain_db,
         )
         time.sleep(max(0.0, AUDIO_RTL_RELEASE_SETTLE_SECONDS))
@@ -785,7 +801,7 @@ class AudioOperations:
                 powers = row["powers_db"]
                 nearby = [
                     float(powers[index])
-                    for index in (center - 1, center, center + 1)
+                    for index in range(center - 8, center + 9)
                     if 0 <= index < len(powers)
                 ]
                 if not nearby:
@@ -928,7 +944,9 @@ class AudioOperations:
             "rf_scanned_frequency_count": len(rf_results),
             "audio_validated_frequency_count": len(validated),
             "selection_policy": selection_policy,
-            "scan_range_hz": [FAST_NOAA_LOW_HZ, FAST_NOAA_HIGH_HZ],
+            "scan_range_hz": [NOAA_SEARCH_LOW_HZ, NOAA_SEARCH_HIGH_HZ],
+            "scan_bin_hz": NOAA_SEARCH_BIN_HZ,
+            "scan_gain_db": NOAA_SEARCH_GAIN_DB,
         }
 
 
@@ -2525,6 +2543,14 @@ class PiPortHandler(BaseHTTPRequestHandler):
             elif request.path == "/api/settings/airband-scan":
                 tuning = self.settings.save_airband_tuning(self.read_json())
                 self.send_json({"saved": True, **tuning})
+            elif request.path == "/api/noaa/select":
+                payload = self.read_json()
+                frequency_hz = int(payload.get("frequency_hz", 0))
+                if frequency_hz not in NOAA_FREQUENCIES:
+                    raise ValueError("Selected NOAA frequency is not a standard NOAA channel.")
+                station = f"Manual NOAA — {NOAA_CHANNEL_NAMES[frequency_hz]} {frequency_hz / 1_000_000:.3f} MHz"
+                self.settings.save_noaa_selection(frequency_hz, station)
+                self.send_json({"saved": True, "noaa_frequency_hz": frequency_hz, "noaa_station": station, **self.port_status()})
             elif request.path == "/api/settings/airband-playback-squelch":
                 tuning = self.settings.adjust_airband_playback_squelch(self.read_json().get("delta_rms"))
                 self.scan.note_playback_squelch_changed()

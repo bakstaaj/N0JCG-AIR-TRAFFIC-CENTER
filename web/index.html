@@ -38,7 +38,17 @@
     <div class="menu-button-row primary-actions">
       <button id="noaaMenuToggle" type="button">Start NOAA Weather</button>
       <button id="airbandMenuToggle" type="button">Start Airband Scanner</button>
-      <button id="airbandSkipHeld" type="button" disabled>Skip</button>
+      <label class="noaa-channel-picker" for="noaaChannelSelect"><span>NOAA Channel</span>
+        <select id="noaaChannelSelect" aria-label="Select NOAA Weather Radio channel">
+          <option value="162400000">WX1 · 162.400 MHz</option>
+          <option value="162425000">WX2 · 162.425 MHz</option>
+          <option value="162450000">WX3 · 162.450 MHz</option>
+          <option value="162475000">WX4 · 162.475 MHz</option>
+          <option value="162500000">WX5 · 162.500 MHz</option>
+          <option value="162525000">WX6 · 162.525 MHz</option>
+          <option value="162550000">WX7 · 162.550 MHz</option>
+        </select>
+      </label>
       <button id="airbandBlockHeld" class="stop" type="button" disabled>Block Frequency</button>
     </div>
     <div id="operationsMessage" class="message warning compact-message">Start Airband Scanner to monitor frequencies. A detected signal plays live until quiet, skipped or blocked. NOAA uses the shared audio receiver.</div>
