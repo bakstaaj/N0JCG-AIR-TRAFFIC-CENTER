@@ -1401,7 +1401,6 @@ class AirbandScanPort:
             self.release_hold_event.clear()
 
     def _run_fast_spectrum(self, channels: list[dict[str, Any]]) -> None:
-        del channels
         try:
             while not self.stop_event.is_set():
                 with self.lock:
@@ -1474,8 +1473,14 @@ class AirbandScanPort:
                 time.sleep(0.05)
         except Exception as exc:
             with self.lock:
-                self.state["airband_scan_error"] = str(exc)
-                self.state["airband_scan_state"] = "error"
+                self.state["airband_scan_warning"] = (
+                    f"Fast Spectrum Search unavailable: {exc}. Falling back to Traditional Audio Samples."
+                )
+                self.state["airband_last_warning"] = self.state["airband_scan_warning"]
+                self.state["airband_scan_state"] = "searching"
+            LOG.warning("Fast Airband spectrum search failed; falling back to traditional audio scan: %s", exc)
+            if not self.stop_event.is_set():
+                self._run(channels)
         finally:
             self.audio_ops.live_airband_stop()
             with self.lock:
